@@ -1,0 +1,65 @@
+services:
+
+  # The comparison API. Calls the simulator over HTTP.
+  api:
+    build: ./api
+    environment:
+      APP_ENV: dev
+      APP_SIMULATOR_ENABLED: 0
+      PARTNER_SIMULATOR_BASE_URL: http://simulator
+      PARTNER_TIMEOUT_MS: 2000
+      COMPARISON_DEADLINE_MS: 3000
+      CIRCUIT_BREAKER_THRESHOLD: 3
+      CIRCUIT_BREAKER_COOLDOWN_S: 30
+    ports:
+      - "8000:80"
+    depends_on:
+      - simulator
+
+  # The four partners. Same image as the API, different role.
+  # A separate container is required: the API calling itself through a
+  # worker pool smaller than the partner count deadlocks, and the
+  # symptom is a timeout.
+  simulator:
+    build: ./api
+    environment:
+      APP_ENV: dev
+      APP_SIMULATOR_ENABLED: 1
+      # Leave PARTNER_SIMULATION_SEED unset so partner problems are a
+      # surprise in dev. Set it to pin behaviour.
+      # PARTNER_SIMULATION_SEED: 1234
+    expose:
+      - "80"
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      # Provisioned from files in the repo, never clicked together by hand.
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

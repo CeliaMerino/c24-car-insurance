@@ -1,0 +1,42 @@
+---
+description: Symfony backend conventions, layer rules, and prohibited patterns
+globs: api/**/*.php
+---
+
+## Layers
+
+```
+Domain          imports nothing outside Domain
+Application     imports Domain and its own ports, never Infrastructure
+Infrastructure  implements ports, adapts frameworks, holds no business rules
+Simulator       stands in for a third party, imports nothing from Domain or Application
+```
+
+`Domain` contains no Symfony class, no attribute, no HTTP concept, and no date construction.
+
+## Conventions
+
+- PHP 8.3, `declare(strict_types=1)` in every file.
+- Constructor property promotion. Readonly where the value does not change.
+- Value objects over primitives for `Money`, `PostalCode`, `Age`, `PartnerId`.
+- Enums for `CoverageLevel`, `CarCategory`, `Usage`, `AnnualMileage`, `PartnerStatus`.
+- Ports are interfaces in `Application/Port`. One implementation per port in `Infrastructure`.
+- Every timing value comes from configuration, never a constant in code.
+- PHPStan level 8 must pass. No `@phpstan-ignore` without a comment explaining it.
+
+## Never do these
+
+From `specs/03-architecture.md` section 6:
+
+1. Call partners sequentially — whether by using `NativeHttpClient`, by reading each response inside the dispatch loop, or by blocking in the simulator's handler.
+2. Put pricing logic anywhere in `Infrastructure/Partner`. Factor tables live in `src/Simulator`.
+3. Sort offers before applying campaign discounts. Discounts first, then sort by final price.
+4. Return a non-200 status when zero partners produced an offer.
+5. Let a partner exception reach the controller.
+6. Read from a cancelled response.
+7. Call `new DateTimeImmutable()` or `time()` outside `Infrastructure`.
+8. Hard-code a partner as a fallback when others fail.
+
+## HTTP client
+
+Partner calls use `CurlHttpClient` explicitly. Every request sets both `timeout` and `max_duration`. The global deadline is the timeout argument to `stream()`. See `specs/03-architecture.md` section 3.2 for the exact shape.

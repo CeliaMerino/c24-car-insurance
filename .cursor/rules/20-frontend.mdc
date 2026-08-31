@@ -1,0 +1,43 @@
+---
+description: Vue 3 frontend conventions and state rules
+globs: frontend/**/*.ts,frontend/**/*.vue
+---
+
+## Stack
+
+Vue 3, TypeScript, Composition API with `<script setup>`. Vite. Vitest and Vue Test Utils.
+
+**No Pinia** (ADR-010). Form state is a single `reactive()` object owned by `useQuoteForm`. If shared state ever outgrows that, it is a decision to record, not a refactor to make quietly.
+
+**No localStorage wrapper libraries.** `useFormStorage` is a few lines against the browser API.
+
+## Steps are data, not layout
+
+```ts
+const steps = [
+  { id: 'driver',   fields: ['dateOfBirth', 'postalCode'] },
+  { id: 'vehicle',  fields: ['carCategory', 'usage', 'annualMileage', 'garage'] },
+  { id: 'coverage', fields: ['coverage'] },
+]
+```
+
+V1 renders all three on one page. The later multi-page funnel must be a routing and layout change only, with no change to state or validation. Nothing outside the rendering components may assume a single page.
+
+## Validation
+
+Rules are declared once per field and shared by blur validation and submit validation. They mirror `specs/05-api-contract.md` section 2.1 exactly. Server field errors map back onto the same fields, so both paths produce identical UI.
+
+The submit button is always enabled. Pressing it with invalid input reveals every error at once and moves focus to the first invalid field.
+
+## States
+
+All eight states in `specs/01-product-spec.md` section 7.3 must exist and be reachable. The two that get forgotten are "request error with form values preserved" and "stale input not restored".
+
+Partial results show the offers that arrived and nothing else — no banner, no partner count (ADR-007). The `partners` array in the response is not rendered in v1.
+
+## Conventions
+
+- Types for API requests and responses live in `src/api/types.ts` and mirror the contract exactly. `snake_case` on the wire, `camelCase` in the app, converted at the boundary in `src/api/client.ts`.
+- Money arrives as integer cents and is formatted only at render time.
+- Mobile first. One breakpoint at 768px.
+- No component reaches for `fetch` directly. Everything goes through `src/api/client.ts`.

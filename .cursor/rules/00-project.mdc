@@ -1,0 +1,19 @@
+---
+description: Project context and working discipline
+alwaysApply: true
+---
+
+Read `AGENTS.md` first. It holds the shared project context: source of truth, layout, and the rules that hold everywhere. This file adds only how to work in this repository.
+
+## Working discipline
+
+- Implement one phase at a time, from `specs/01-product-spec.md` section 11. Do not start a phase that was not asked for, and do not build ahead.
+- Never edit anything under `specs/` unless explicitly asked. When you find a gap or a contradiction in a specification, report it and stop; do not resolve it by choosing.
+- Never edit `vendor/`, `node_modules/`, or lock files by hand.
+- Prefer editing an existing file over creating a new one.
+- Do not add a dependency without stating what it replaces and why the standard library or the framework is not enough.
+- Tests belong in the same change as the code they cover, at the level `specs/06-testing.md` assigns them.
+
+## When you are unsure
+
+Say so. An answer of "the specification does not cover this" is correct and useful. A plausible invention is worse than a question, because it will be indistinguishable from a specified decision when it is reviewed.
