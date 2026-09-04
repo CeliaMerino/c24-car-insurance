@@ -1,0 +1,39 @@
+# The simulator side of specs/04-providers.md section 7: how each partner
+# behaves. Base premiums and factor tables are deliberately NOT here. They are
+# typed code in src/Simulator/Pricing, one class per partner, because they are
+# the partner's underwriting and a typo in a YAML factor table is much harder to
+# catch than one in typed code.
+#
+# `http_error_status` is not in the specification's example. Section 4 gives
+# aurum HTTP 500 and celeris and dorsal HTTP 503, and the status has to live
+# somewhere; keeping it out of `failures` leaves that mapping exactly as the
+# specification writes it, a mode name against a probability.
+parameters:
+    simulator.partners:
+        aurum:
+            latency_ms: [80, 250]
+            spike: null
+            http_error_status: 500
+            failures:
+                http_error: 0.01
+        bastion:
+            latency_ms: [1200, 1900]
+            spike: null
+            failures:
+                connection_error: 0.02
+        celeris:
+            latency_ms: [100, 300]
+            spike:
+                probability: 0.15
+                latency_ms: [2500, 4500]
+            http_error_status: 503
+            failures:
+                http_error: 0.03
+        dorsal:
+            latency_ms: [200, 600]
+            spike: null
+            http_error_status: 503
+            failures:
+                http_error: 0.08
+                malformed: 0.06
+                non_json: 0.02

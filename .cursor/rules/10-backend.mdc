@@ -28,14 +28,15 @@ Simulator       stands in for a third party, imports nothing from Domain or Appl
 
 From `specs/03-architecture.md` section 6:
 
-1. Call partners sequentially — whether by using `NativeHttpClient`, by reading each response inside the dispatch loop, or by blocking in the simulator's handler.
-2. Put pricing logic anywhere in `Infrastructure/Partner`. Factor tables live in `src/Simulator`.
-3. Sort offers before applying campaign discounts. Discounts first, then sort by final price.
-4. Return a non-200 status when zero partners produced an offer.
-5. Let a partner exception reach the controller.
-6. Read from a cancelled response.
-7. Call `new DateTimeImmutable()` or `time()` outside `Infrastructure`.
-8. Hard-code a partner as a fallback when others fail.
+1. Call partners sequentially — whether by using `NativeHttpClient` or by reading each response inside the dispatch loop.
+2. Run the simulator with a worker pool smaller than the partner count. Its latency is a plain sleep, which `specs/04-providers.md` section 5.3 allows; an undersized pool turns those sleeps into a queue.
+3. Put pricing logic anywhere in `Infrastructure/Partner`. Factor tables live in `src/Simulator`.
+4. Sort offers before applying campaign discounts. Discounts first, then sort by final price.
+5. Return a non-200 status when zero partners produced an offer.
+6. Let a partner exception reach the controller.
+7. Read from a cancelled response.
+8. Call `new DateTimeImmutable()` or `time()` outside `Infrastructure`.
+9. Hard-code a partner as a fallback when others fail.
 
 ## HTTP client
 

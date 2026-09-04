@@ -117,6 +117,29 @@ final class QuoteRequestBuilder
         return $clone;
     }
 
+    /**
+     * The same request as `build()`, in the wire shape of
+     * specs/05-api-contract.md section 2.1. This is what the simulator and the
+     * API endpoint both receive, so vector data is written once.
+     *
+     * Unlike `build()` it applies no validation, which is what lets an age
+     * boundary below 18 be expressed.
+     *
+     * @return array<string, mixed>
+     */
+    public function toPayload(): array
+    {
+        return [
+            'date_of_birth' => $this->dateOfBirth,
+            'postal_code' => $this->postalCode,
+            'car_category' => $this->carCategory->value,
+            'usage' => $this->usage->value,
+            'annual_mileage' => $this->annualMileage->value,
+            'garage' => $this->garage,
+            'coverage' => $this->coverage->value,
+        ];
+    }
+
     public function build(): QuoteRequest
     {
         $reference = $this->referenceDate;

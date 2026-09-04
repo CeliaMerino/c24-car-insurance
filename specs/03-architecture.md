@@ -229,7 +229,8 @@ Every timing value is configuration. None of them is a constant in code, because
 
 Failure modes specific enough to check for in review:
 
-- Call partners sequentially, whether by using `NativeHttpClient`, by awaiting each response inside the dispatch loop, or by using a blocking sleep in the simulator's own handler.
+- Call partners sequentially, whether by using `NativeHttpClient` or by awaiting each response inside the dispatch loop.
+- Run the simulator with a worker pool smaller than the partner count. Its latency is a plain sleep, which `04-providers.md` section 5.3 permits because each partner call is a separate request served by its own worker; an undersized pool turns those sleeps into a queue, and the symptom is a timeout.
 - Put pricing logic anywhere in `Infrastructure/Partner`.
 - Sort offers before applying campaign discounts.
 - Return a non-200 status when zero partners produced an offer.
