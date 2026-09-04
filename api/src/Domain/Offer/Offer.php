@@ -37,7 +37,7 @@ final readonly class Offer
             );
         }
 
-        if ($campaign->partnerId !== $this->partnerId) {
+        if (!$campaign->partnerId->equals($this->partnerId)) {
             return $this;
         }
 

@@ -1,0 +1,26 @@
+# The API-side partner list of specs/04-providers.md section 7: who exists and
+# how to reach them. Nothing about pricing. timeout_ms is the per-partner
+# ceiling from PARTNER_TIMEOUT_MS (specs/03-architecture.md section 5), not a
+# constant in code.
+parameters:
+    app.partners:
+        aurum:
+            display_name: 'Aurum Direct'
+            enabled: true
+            path: '/sim/partners/aurum/quote'
+            timeout_ms: '%env(int:PARTNER_TIMEOUT_MS)%'
+        bastion:
+            display_name: 'Bastion Insurance'
+            enabled: true
+            path: '/sim/partners/bastion/quote'
+            timeout_ms: '%env(int:PARTNER_TIMEOUT_MS)%'
+        celeris:
+            display_name: 'Celeris Seguros'
+            enabled: true
+            path: '/sim/partners/celeris/quote'
+            timeout_ms: '%env(int:PARTNER_TIMEOUT_MS)%'
+        dorsal:
+            display_name: 'Dorsal Mutual'
+            enabled: true
+            path: '/sim/partners/dorsal/quote'
+            timeout_ms: '%env(int:PARTNER_TIMEOUT_MS)%'

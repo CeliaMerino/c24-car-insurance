@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace App\Domain\Offer;
 
-enum PartnerId: string
+use InvalidArgumentException;
+
+final readonly class PartnerId
 {
-    case Aurum = 'aurum';
-    case Bastion = 'bastion';
-    case Celeris = 'celeris';
-    case Dorsal = 'dorsal';
+    public function __construct(
+        public string $value,
+    ) {
+        if ('' === $this->value) {
+            throw new InvalidArgumentException('Partner id cannot be empty.');
+        }
+    }
+
+    public function equals(self $other): bool
+    {
+        return $this->value === $other->value;
+    }
 }

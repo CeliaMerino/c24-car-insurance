@@ -20,13 +20,13 @@ final class OfferCampaignTest extends TestCase
     public function applies_active_campaign_discount_to_matching_partner(): void
     {
         $offer = Offer::fromPartnerQuote(
-            PartnerId::Aurum,
+            new PartnerId('aurum'),
             CoverageLevel::ThirdPartyPlus,
             new Money(56900),
         );
 
         $campaign = new Campaign(
-            PartnerId::Aurum,
+            new PartnerId('aurum'),
             15,
             'CHECK24 pays 15%',
             new ReferenceDate(2026, 1, 1),
@@ -46,13 +46,13 @@ final class OfferCampaignTest extends TestCase
     public function does_not_apply_expired_campaign(): void
     {
         $offer = Offer::fromPartnerQuote(
-            PartnerId::Aurum,
+            new PartnerId('aurum'),
             CoverageLevel::ThirdPartyPlus,
             new Money(56900),
         );
 
         $campaign = new Campaign(
-            PartnerId::Aurum,
+            new PartnerId('aurum'),
             15,
             'CHECK24 pays 15%',
             new ReferenceDate(2026, 1, 1),
@@ -69,13 +69,13 @@ final class OfferCampaignTest extends TestCase
     public function does_not_apply_campaign_to_different_partner(): void
     {
         $offer = Offer::fromPartnerQuote(
-            PartnerId::Celeris,
+            new PartnerId('celeris'),
             CoverageLevel::ThirdPartyPlus,
             new Money(47800),
         );
 
         $campaign = new Campaign(
-            PartnerId::Aurum,
+            new PartnerId('aurum'),
             15,
             'CHECK24 pays 15%',
             new ReferenceDate(2026, 1, 1),

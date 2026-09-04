@@ -19,5 +19,17 @@ services:
     App\:
         resource: '../src/'
 
+    # CurlHttpClient explicitly. NativeHttpClient does not multiplex
+    # (specs/03-architecture.md section 3.2).
+    Symfony\Component\HttpClient\CurlHttpClient: ~
+
+    App\Infrastructure\Partner\HttpPartnerGateway:
+        arguments:
+            $client: '@Symfony\Component\HttpClient\CurlHttpClient'
+
+    App\Application\CompareOffers\CompareOffersHandler:
+        arguments:
+            $deadlineMs: '%env(int:COMPARISON_DEADLINE_MS)%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
