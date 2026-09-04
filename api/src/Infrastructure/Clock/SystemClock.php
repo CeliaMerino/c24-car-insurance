@@ -9,11 +9,13 @@ use App\Domain\Shared\ReferenceDate;
 use DateTimeImmutable;
 use DateTimeZone;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
+use Symfony\Component\DependencyInjection\Attribute\WhenNot;
 
 /**
  * Process time. Infrastructure is the only layer allowed to construct a date
  * (specs/03-architecture.md section 2.3).
  */
+#[WhenNot(env: 'test')]
 #[AsAlias(Clock::class)]
 final class SystemClock implements Clock
 {

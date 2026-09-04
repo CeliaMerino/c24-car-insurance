@@ -9,6 +9,7 @@ use App\Simulator\Clock\SimulatorDate;
 use DateTimeImmutable;
 use DateTimeZone;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
+use Symfony\Component\DependencyInjection\Attribute\WhenNot;
 
 /**
  * The simulator's clock, here rather than in `src/Simulator` because
@@ -16,6 +17,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
  * (specs/03-architecture.md section 2.3). The dependency points inward: the
  * simulator declares the interface and never learns of this class.
  */
+#[WhenNot(env: 'test')]
 #[AsAlias(SimulatorClock::class)]
 final class SystemSimulatorClock implements SimulatorClock
 {

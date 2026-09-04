@@ -33,3 +33,20 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+when@test:
+    services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+
+        App\Tests\Support\KernelHttpClient:
+            arguments:
+                $kernel: '@kernel'
+
+        # L5 talks to the real simulator in-process. CurlHttpClient would try
+        # to open a TCP connection to PARTNER_SIMULATOR_BASE_URL, which is not
+        # listening during PHPUnit.
+        App\Infrastructure\Partner\HttpPartnerGateway:
+            arguments:
+                $client: '@App\Tests\Support\KernelHttpClient'
