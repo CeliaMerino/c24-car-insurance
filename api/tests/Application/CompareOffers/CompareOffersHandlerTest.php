@@ -27,6 +27,7 @@ use App\Tests\Support\ReferenceDates;
 use App\Tests\Support\RegisteredPartners;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * L4. Orchestration: ordering, discount-then-sort, partial results, a fifth
@@ -47,9 +48,11 @@ final class CompareOffersHandlerTest extends TestCase
             'aurum' => $this->campaign('aurum', 15, new ReferenceDate(2026, 1, 1), new ReferenceDate(2026, 8, 31)),
         ]);
 
+        $metrics = new RecordingMetricsRecorder();
         $comparison = $this->handler(
             $gateway,
             [RegisteredPartners::aurum()],
+            $metrics,
             campaigns: $campaigns,
         )->handle($this->query());
 
@@ -59,6 +62,7 @@ final class CompareOffersHandlerTest extends TestCase
         self::assertNotNull($offer->discount);
         self::assertSame(15, $offer->discount->percentage);
         self::assertSame('CHECK24 pays 15%', $offer->discount->label);
+        self::assertSame(['aurum'], $metrics->campaignsApplied);
     }
 
     #[Test]
@@ -291,6 +295,8 @@ final class CompareOffersHandlerTest extends TestCase
         )->handle($this->query());
 
         self::assertSame(5, $metrics->comparisonDurationMs);
+        self::assertSame(CoverageLevel::ThirdPartyPlus, $metrics->comparisonCoverage);
+        self::assertSame(1, $metrics->offerCount);
         self::assertCount(2, $metrics->partnerOutcomes);
         self::assertSame('aurum', $metrics->partnerOutcomes[0]['partner']);
         self::assertSame(PartnerStatus::Ok, $metrics->partnerOutcomes[0]['status']);
@@ -318,6 +324,7 @@ final class CompareOffersHandlerTest extends TestCase
             $campaigns ?? new InMemoryCampaignRepository(),
             $metrics ?? new RecordingMetricsRecorder(),
             $clock,
+            new NullLogger(),
             $deadlineMs,
         );
     }

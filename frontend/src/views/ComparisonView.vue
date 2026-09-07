@@ -10,6 +10,7 @@ import RequestError from '../components/states/RequestError.vue'
 import RestoreNotice from '../components/states/RestoreNotice.vue'
 import { useComparison } from '../composables/useComparison'
 import { useFormStorage } from '../composables/useFormStorage'
+import { postEvent } from '../api/client'
 import {
   hasAnyValue,
   hasFieldErrors,
@@ -54,6 +55,8 @@ const comparison = useComparison()
 let skipPersist = false
 
 onMounted(() => {
+  void postEvent('form_started')
+
   const restored = storage.read()
   if (restored === null) {
     return
@@ -62,10 +65,20 @@ onMounted(() => {
   skipPersist = true
   hydrate(restored)
   form.restoreNoticeVisible = true
+  void postEvent('form_restored')
   void nextTick(() => {
     skipPersist = false
   })
 })
+
+watch(
+  () => comparison.state.status,
+  (status) => {
+    if (status === 'success' || status === 'empty') {
+      void postEvent('results_viewed')
+    }
+  },
+)
 
 watch(
   [

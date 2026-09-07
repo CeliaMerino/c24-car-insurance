@@ -73,6 +73,24 @@ export async function createComparison(request: ComparisonRequest): Promise<Comp
   }
 }
 
+export type FrontendEvent = 'form_started' | 'form_restored' | 'results_viewed'
+
+/** Fire-and-forget funnel event. Failures are ignored so the UI never blocks on analytics. */
+export async function postEvent(event: FrontendEvent): Promise<void> {
+  try {
+    await fetch(`${apiBaseUrl()}/events`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ event }),
+    })
+  } catch {
+    return
+  }
+}
+
 function toRequestDto(request: ComparisonRequest): ComparisonRequestDto {
   return {
     date_of_birth: request.dateOfBirth,

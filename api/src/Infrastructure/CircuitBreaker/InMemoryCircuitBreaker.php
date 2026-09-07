@@ -6,6 +6,7 @@ namespace App\Infrastructure\CircuitBreaker;
 
 use App\Application\Port\CircuitBreaker;
 use App\Application\Port\Clock;
+use App\Domain\Comparison\CircuitBreakerTransition;
 use App\Domain\Comparison\PartnerStatus;
 use App\Domain\Offer\PartnerId;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
@@ -57,27 +58,39 @@ final class InMemoryCircuitBreaker implements CircuitBreaker
         return $callable;
     }
 
-    public function recordOutcome(PartnerId $partnerId, PartnerStatus $status): void
+    public function recordOutcome(PartnerId $partnerId, PartnerStatus $status): ?CircuitBreakerTransition
     {
         if (PartnerStatus::Skipped === $status) {
-            return;
+            return null;
         }
 
         $key = $partnerId->value;
 
         if (PartnerStatus::Ok === $status) {
+            $previous = $this->state[$key] ?? self::CLOSED;
             unset($this->consecutiveFailures[$key], $this->state[$key], $this->openedAtMs[$key]);
 
-            return;
+            if (self::CLOSED !== $previous) {
+                return CircuitBreakerTransition::Closed;
+            }
+
+            return null;
         }
 
         $wasHalfOpen = self::HALF_OPEN === ($this->state[$key] ?? self::CLOSED);
+        $alreadyOpen = self::OPEN === ($this->state[$key] ?? self::CLOSED);
         $this->consecutiveFailures[$key] = ($this->consecutiveFailures[$key] ?? 0) + 1;
 
         if ($wasHalfOpen || $this->consecutiveFailures[$key] >= $this->failureThreshold) {
             $this->state[$key] = self::OPEN;
             $this->openedAtMs[$key] = $this->clock->monotonicMs();
+
+            if (!$alreadyOpen) {
+                return CircuitBreakerTransition::Opened;
+            }
         }
+
+        return null;
     }
 
     private function isCallable(PartnerId $partnerId): bool

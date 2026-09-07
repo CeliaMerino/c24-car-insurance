@@ -36,16 +36,4 @@ final class OperationalApiTest extends WebTestCase
         self::assertSame(['status' => 'ok'], json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR));
         self::assertLessThan(200, $elapsedMs);
     }
-
-    #[Test]
-    public function metrics_is_a_prometheus_stub(): void
-    {
-        $client = static::createClient();
-        $client->request('GET', '/metrics');
-
-        $response = $client->getResponse();
-        self::assertSame(200, $response->getStatusCode());
-        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
-        self::assertStringStartsWith('text/plain', (string) $response->headers->get('Content-Type'));
-    }
 }

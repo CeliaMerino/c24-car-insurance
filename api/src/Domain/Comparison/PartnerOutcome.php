@@ -14,6 +14,7 @@ final readonly class PartnerOutcome
         public PartnerStatus $status,
         public int $durationMs,
         public ?Offer $offer,
+        public ?int $httpStatus = null,
     ) {
     }
 }

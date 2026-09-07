@@ -11,11 +11,13 @@ use App\Application\Port\MetricsRecorder;
 use App\Application\Port\PartnerGateway;
 use App\Application\Port\PartnerRegistry;
 use App\Application\Port\RegisteredPartner;
+use App\Domain\Comparison\CircuitBreakerTransition;
 use App\Domain\Comparison\Comparison;
 use App\Domain\Comparison\PartnerOutcome;
 use App\Domain\Comparison\PartnerStatus;
 use App\Domain\Offer\Offer;
 use App\Domain\Offer\OfferSorter;
+use Psr\Log\LoggerInterface;
 
 /**
  * Sequence of specs/03-architecture.md section 3.1. Open partners are not
@@ -31,6 +33,7 @@ final readonly class CompareOffersHandler
         private CampaignRepository $campaigns,
         private MetricsRecorder $metrics,
         private Clock $clock,
+        private LoggerInterface $logger,
         private int $deadlineMs,
     ) {
     }
@@ -49,7 +52,17 @@ final readonly class CompareOffersHandler
         }
 
         foreach ($outcomes as $outcome) {
-            $this->breaker->recordOutcome($outcome->partnerId, $outcome->status);
+            $transition = $this->breaker->recordOutcome($outcome->partnerId, $outcome->status);
+            if (CircuitBreakerTransition::Opened === $transition) {
+                $this->metrics->recordCircuitBreakerOpened($outcome->partnerId);
+            }
+            if (null !== $transition) {
+                $this->logger->warning('circuit_breaker.transition', [
+                    'comparison_id' => $query->comparisonId,
+                    'partner' => $outcome->partnerId->value,
+                    'new_state' => $transition->value,
+                ]);
+            }
         }
 
         $today = $this->clock->today();
@@ -57,7 +70,11 @@ final readonly class CompareOffersHandler
         foreach ($outcomes as $outcome) {
             if (PartnerStatus::Ok === $outcome->status && $outcome->offer instanceof Offer) {
                 $campaign = $this->campaigns->findForPartner($outcome->offer->partnerId, $today);
-                $offers[] = $outcome->offer->withCampaign($campaign, $today);
+                $offer = $outcome->offer->withCampaign($campaign, $today);
+                $offers[] = $offer;
+                if (null !== $offer->discount) {
+                    $this->metrics->recordCampaignApplied($offer->partnerId);
+                }
             }
         }
 
@@ -66,10 +83,32 @@ final readonly class CompareOffersHandler
 
         $durationMs = $this->clock->monotonicMs() - $startedMs;
 
-        $this->metrics->recordComparisonDuration($durationMs);
+        $this->metrics->recordComparison($query->request->coverage, $durationMs, count($offers));
         foreach ($outcomes as $outcome) {
             $this->metrics->recordPartnerOutcome($outcome->partnerId, $outcome->status, $outcome->durationMs);
+            if (PartnerStatus::Ok !== $outcome->status && PartnerStatus::Skipped !== $outcome->status) {
+                $this->logger->warning('partner.failure', [
+                    'comparison_id' => $query->comparisonId,
+                    'partner' => $outcome->partnerId->value,
+                    'status' => $outcome->status->value,
+                    'duration_ms' => $outcome->durationMs,
+                    'http_status' => $outcome->httpStatus,
+                ]);
+            }
         }
+
+        $partnerStatuses = [];
+        foreach ($outcomes as $outcome) {
+            $partnerStatuses[$outcome->partnerId->value] = $outcome->status->value;
+        }
+
+        $this->logger->info('comparison.completed', [
+            'comparison_id' => $query->comparisonId,
+            'duration_ms' => $durationMs,
+            'offer_count' => count($offers),
+            'coverage' => $query->request->coverage->value,
+            'partner_statuses' => $partnerStatuses,
+        ]);
 
         return new Comparison(
             $query->comparisonId,

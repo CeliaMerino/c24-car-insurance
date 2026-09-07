@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Port;
 
+use App\Domain\Comparison\CircuitBreakerTransition;
 use App\Domain\Comparison\PartnerStatus;
 use App\Domain\Offer\PartnerId;
 
@@ -16,5 +17,5 @@ interface CircuitBreaker
      */
     public function callablePartners(array $partnerIds): array;
 
-    public function recordOutcome(PartnerId $partnerId, PartnerStatus $status): void;
+    public function recordOutcome(PartnerId $partnerId, PartnerStatus $status): ?CircuitBreakerTransition;
 }

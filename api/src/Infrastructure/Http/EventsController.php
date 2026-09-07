@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http;
 
-use App\Application\CompareOffers\CompareOffersHandler;
-use App\Application\CompareOffers\CompareOffersQuery;
-use App\Application\Port\Clock;
 use App\Application\Port\MetricsRecorder;
-use App\Domain\Validation\ValidationException;
+use App\Domain\Validation\ValidationError;
 use JsonException;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Uid\Ulid;
 
 /**
- * POST /api/v1/comparisons of specs/05-api-contract.md section 2.
+ * POST /api/v1/events — browser funnel events (specs/07-observability.md section 3.2).
  */
 #[AsController]
-final readonly class ComparisonController
+final readonly class EventsController
 {
+    private const array ACCEPTED = [
+        'form_started' => true,
+        'form_restored' => true,
+        'results_viewed' => true,
+    ];
+
     public function __construct(
-        private QuoteRequestParser $parser,
-        private CompareOffersHandler $handler,
-        private ComparisonResponseMapper $mapper,
-        private Clock $clock,
         private MetricsRecorder $metrics,
     ) {
     }
 
-    #[Route('/api/v1/comparisons', name: 'api_v1_comparisons', methods: ['POST'])]
-    public function compare(Request $request): Response
+    #[Route('/api/v1/events', name: 'api_v1_events', methods: ['POST'])]
+    public function record(Request $request): Response
     {
         if (!$this->isJson($request)) {
             return ProblemResponse::malformed('Content-Type must be application/json.');
@@ -52,23 +49,20 @@ final readonly class ComparisonController
             return ProblemResponse::malformed('Request body must be a JSON object.');
         }
 
-        /** @var array<string, mixed> $decoded */
-        try {
-            $quoteRequest = $this->parser->parse($decoded, $this->clock->today());
-        } catch (ValidationException $exception) {
-            foreach ($exception->errors as $error) {
-                $this->metrics->recordValidationError($error->field, $error->code);
-            }
-
-            return ProblemResponse::validation($exception->errors);
+        $event = $decoded['event'] ?? null;
+        if (!is_string($event) || !isset(self::ACCEPTED[$event])) {
+            return ProblemResponse::validation([
+                new ValidationError(
+                    'event',
+                    'unknown_event',
+                    'Event must be one of: form_started, form_restored, results_viewed.',
+                ),
+            ]);
         }
 
-        $comparison = $this->handler->handle(new CompareOffersQuery(
-            $quoteRequest,
-            (new Ulid())->toString(),
-        ));
+        $this->metrics->recordFrontendEvent($event);
 
-        return new JsonResponse($this->mapper->map($comparison));
+        return new Response(status: Response::HTTP_NO_CONTENT);
     }
 
     private function isJson(Request $request): bool

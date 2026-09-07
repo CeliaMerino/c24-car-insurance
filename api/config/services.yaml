@@ -31,6 +31,16 @@ services:
         arguments:
             $deadlineMs: '%env(int:COMPARISON_DEADLINE_MS)%'
 
+    # Shared APCu (or in-memory under test) registry for Prometheus metrics
+    # (specs/07-observability.md section 2). Must stay public so the factory
+    # is not inlined into each consumer as a separate InMemory instance.
+    Prometheus\CollectorRegistry:
+        public: true
+        shared: true
+        factory: ['App\Infrastructure\Observability\PrometheusRegistryFactory', 'create']
+        arguments:
+            $environment: '%kernel.environment%'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 

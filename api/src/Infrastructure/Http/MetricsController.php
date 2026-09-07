@@ -4,25 +4,34 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http;
 
+use Prometheus\CollectorRegistry;
+use Prometheus\RenderTextFormat;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Stub for GET /metrics (specs/05-api-contract.md section 3). The Prometheus
- * recorder arrives in the observability phase; this only reserves the path
- * and the exposition content type.
+ * GET /metrics — Prometheus exposition (specs/05-api-contract.md section 3,
+ * specs/07-observability.md section 3).
  */
 #[AsController]
-final class MetricsController
+final readonly class MetricsController
 {
+    public function __construct(
+        private CollectorRegistry $registry,
+    ) {
+    }
+
     #[Route('/metrics', name: 'metrics', methods: ['GET'])]
     public function metrics(): Response
     {
+        $renderer = new RenderTextFormat();
+        $body = $renderer->render($this->registry->getMetricFamilySamples());
+
         return new Response(
-            "# Metrics are not implemented yet.\n",
+            $body,
             Response::HTTP_OK,
-            ['Content-Type' => 'text/plain; version=0.0.4; charset=utf-8'],
+            ['Content-Type' => RenderTextFormat::MIME_TYPE],
         );
     }
 }

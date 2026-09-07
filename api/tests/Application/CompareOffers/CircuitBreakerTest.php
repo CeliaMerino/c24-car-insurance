@@ -24,6 +24,7 @@ use App\Tests\Support\ReferenceDates;
 use App\Tests\Support\RegisteredPartners;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * L4. Circuit breaker transitions (specs/03-architecture.md section 3.5,
@@ -309,6 +310,25 @@ final class CircuitBreakerTest extends TestCase
         self::assertSame(CoverageLevel::ThirdPartyPlus, $comparison->coverage);
     }
 
+    #[Test]
+    public function opening_the_breaker_is_recorded_as_a_metric(): void
+    {
+        $clock = new FakeClock(ReferenceDates::frozen());
+        $breaker = $this->breaker($clock);
+        $gateway = new FakePartnerGateway([
+            'aurum' => $this->failure('aurum', PartnerStatus::Error),
+        ]);
+        $metrics = new RecordingMetricsRecorder();
+        $handler = $this->handler($gateway, $breaker, $clock, [RegisteredPartners::aurum()], $metrics);
+
+        $handler->handle($this->query());
+        $handler->handle($this->query());
+        self::assertSame([], $metrics->circuitBreakerOpened);
+
+        $handler->handle($this->query());
+        self::assertSame(['aurum'], $metrics->circuitBreakerOpened);
+    }
+
     private function breaker(FakeClock $clock): InMemoryCircuitBreaker
     {
         return new InMemoryCircuitBreaker($clock, self::THRESHOLD, self::COOLDOWN_S);
@@ -322,14 +342,16 @@ final class CircuitBreakerTest extends TestCase
         InMemoryCircuitBreaker $breaker,
         FakeClock $clock,
         ?array $partners = null,
+        ?RecordingMetricsRecorder $metrics = null,
     ): CompareOffersHandler {
         return new CompareOffersHandler(
             new InMemoryPartnerRegistry($partners ?? [RegisteredPartners::aurum(), RegisteredPartners::bastion()]),
             $breaker,
             $gateway,
             new InMemoryCampaignRepository(),
-            new RecordingMetricsRecorder(),
+            $metrics ?? new RecordingMetricsRecorder(),
             $clock,
+            new NullLogger(),
             3000,
         );
     }

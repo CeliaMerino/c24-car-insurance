@@ -1,0 +1,65 @@
+groups:
+  - name: comparison
+    rules:
+      - alert: PartnerDegraded
+        expr: |
+          (
+            sum by (partner) (rate(c24_partner_requests_total{status="ok"}[10m]))
+            /
+            sum by (partner) (rate(c24_partner_requests_total[10m]))
+          ) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Partner {{ $labels.partner }} success rate under 90%"
+          description: "Notify partner management. Confirm the breaker opened. Do not change platform code."
+
+      - alert: ComparisonSlow
+        expr: |
+          histogram_quantile(0.95, sum(rate(c24_comparison_duration_seconds_bucket[5m])) by (le)) > 3.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Comparison p95 over 3.1s"
+          description: "Check per-partner p95 first. It is almost always one partner."
+
+      - alert: EmptyResults
+        expr: |
+          (
+            sum(rate(c24_comparison_offers_bucket{le="0"}[10m]))
+            /
+            sum(rate(c24_comparison_offers_count[10m]))
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 1% of comparisons return zero offers"
+          description: "Several partners are down at once, or the simulator is unreachable. Customer-visible."
+
+      - alert: PlatformErrors
+        expr: |
+          (
+            sum(rate(c24_http_responses_total{status=~"5.."}[5m]))
+            /
+            sum(rate(c24_http_responses_total[5m]))
+          ) > 0.005
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API 5xx rate over 0.5%"
+          description: "Page on-call. This is ours, not a partner's."
+
+      - alert: NoTraffic
+        expr: |
+          sum(rate(c24_comparisons_total[15m])) == 0
+          and ON() (hour() >= 9 and hour() < 18 and day_of_week() >= 1 and day_of_week() <= 5)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No comparisons during business hours"
+          description: "Nothing is failing, which is the point. A deploy has broken the form or the SPA cannot reach the API."

@@ -172,10 +172,10 @@ final class HttpPartnerGateway implements PartnerGateway
         try {
             $offer = $this->parser->parse($partner->id, $request->coverage, $statusCode, $body);
         } catch (InvalidPartnerResponse) {
-            return $this->outcome($partner, PartnerStatus::Error, $startedNs, null);
+            return $this->outcome($partner, PartnerStatus::Error, $startedNs, null, $statusCode);
         }
 
-        return $this->outcome($partner, PartnerStatus::Ok, $startedNs, $offer);
+        return $this->outcome($partner, PartnerStatus::Ok, $startedNs, $offer, $statusCode);
     }
 
     private function outcome(
@@ -183,8 +183,9 @@ final class HttpPartnerGateway implements PartnerGateway
         PartnerStatus $status,
         int $startedNs,
         ?Offer $offer,
+        ?int $httpStatus = null,
     ): PartnerOutcome {
-        return new PartnerOutcome($partner->id, $status, $this->elapsedMs($startedNs), $offer);
+        return new PartnerOutcome($partner->id, $status, $this->elapsedMs($startedNs), $offer, $httpStatus);
     }
 
     private function statusFromFailure(Throwable $e): PartnerStatus

@@ -8,7 +8,9 @@
 
 FROM dunglas/frankenphp:php8.3
 
-RUN install-php-extensions intl opcache zip
+# APCu is required for Prometheus metrics shared across FrankenPHP workers
+# (specs/07-observability.md section 2). Without it, counters undercount.
+RUN install-php-extensions intl opcache zip apcu
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
