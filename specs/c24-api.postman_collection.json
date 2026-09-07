@@ -1,0 +1,402 @@
+{
+	"info": {
+		"_postman_id": "00ccf89e-bab2-48e3-8045-9484fc11af9c",
+		"name": "c24-api",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "10486983"
+	},
+	"item": [
+		{
+			"name": "api/v1/comparisons 200 (A)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"1990-05-14\",\n    \"postal_code\": \"28013\",\n    \"car_category\": \"sedan\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"5k_15k\",\n    \"garage\": true,\n    \"coverage\": \"third_party_plus\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 200 (B)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"1981-03-02\",\n    \"postal_code\": \"15001\",\n    \"car_category\": \"van\",\n    \"usage\": \"commercial\",\n    \"annual_mileage\": \"over_30k\",\n    \"garage\": false,\n    \"coverage\": \"comprehensive\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 200 (C)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"1990-05-14\",\n    \"postal_code\": \"28013\",\n    \"car_category\": \"compact\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"under_5k\",\n    \"garage\": true,\n    \"coverage\": \"third_party\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 422 - under 18 years",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"2010-01-01\",\n    \"postal_code\": \"28013\",\n    \"car_category\": \"sedan\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"5k_15k\",\n    \"garage\": true,\n    \"coverage\": \"third_party_plus\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 422 - future date",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"2027-01-01\",\n    \"postal_code\": \"28013\",\n    \"car_category\": \"sedan\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"5k_15k\",\n    \"garage\": true,\n    \"coverage\": \"third_party_plus\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 422 - invalid post code",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"1990-05-14\",\n    \"postal_code\": \"ABCDE\",\n    \"car_category\": \"sedan\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"5k_15k\",\n    \"garage\": true,\n    \"coverage\": \"third_party_plus\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 422 - unknow",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"date_of_birth\": \"1990-05-14\",\n    \"postal_code\": \"28013\",\n    \"car_category\": \"truck\",\n    \"usage\": \"private\",\n    \"annual_mileage\": \"5k_15k\",\n    \"garage\": true,\n    \"coverage\": \"third_party_plus\"\n  }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 422 - required",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{}"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 400 - malformed json",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ not json"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/comparisons 400 - body array",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[]"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/comparisons",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"comparisons"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/events",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \"event\": \"form_started\" }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/events",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"events"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "api/v1/events 422 - unknown event",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \"event\": \"button_clicked\" }"
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/v1/events",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"v1",
+						"events"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

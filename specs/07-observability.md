@@ -1,7 +1,7 @@
 # Observability Specification
 
 **Status:** Draft
-**Related documents:** `01-product-spec.md` section 9, `03-architecture.md`, `05-api-contract.md`, `06-testing.md`
+**Related documents:** `01-product-spec.md` section 9, `03-architecture.md`, `05-api-contract.md`, `06-testing.md`, [`c24-api.postman_collection.json`](c24-api.postman_collection.json)
 
 ---
 
@@ -54,7 +54,7 @@ Namespace `c24`. Durations in seconds, per Prometheus convention, formatted as m
 
 Three things only the browser knows. They arrive through one endpoint.
 
-**`POST /api/v1/events`**
+**`POST /api/v1/events`** — example requests are in [`c24-api.postman_collection.json`](c24-api.postman_collection.json).
 
 ```json
 { "event": "form_started" }

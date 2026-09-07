@@ -23,7 +23,7 @@ Read in this order:
 ```
 api/         Symfony. src/Domain, src/Application, src/Infrastructure, src/Simulator
 frontend/    Vue 3 + TypeScript SPA
-specs/       Specifications and decision records
+specs/       Specifications and decision records. Also `c24-api.postman_collection.json` (runnable API examples, not a spec)
 ops/         Prometheus and Grafana configuration
 ```
 

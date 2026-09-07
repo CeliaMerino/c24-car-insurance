@@ -1,7 +1,7 @@
 # API Contract
 
 **Status:** Draft
-**Related documents:** `01-product-spec.md`, `03-architecture.md`, `04-providers.md`
+**Related documents:** `01-product-spec.md`, `03-architecture.md`, `04-providers.md`, [`c24-api.postman_collection.json`](c24-api.postman_collection.json) (runnable examples; this document is the contract)
 
 ---
 
@@ -13,6 +13,8 @@
 - Enum values are lowercase identifiers, never display text. Display text is the frontend's job.
 - Errors use `application/problem+json` (RFC 9457).
 - Every response carries `Cache-Control: no-store`. Comparisons contain personal input and are never cacheable.
+
+Runnable examples of the requests below are in [`c24-api.postman_collection.json`](c24-api.postman_collection.json). Import the file in Postman. If the collection and this document disagree, this document is right.
 
 ---
 
