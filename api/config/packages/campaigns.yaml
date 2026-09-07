@@ -1,0 +1,10 @@
+# Campaigns are CHECK24 subsidies applied after partner quotes
+# (specs/01-product-spec.md section 5.4). One optional campaign per partner.
+# Dates are inclusive calendar days, evaluated against the Clock.
+#
+#   aurum:
+#     percentage: 15
+#     start_date: '2026-01-01'
+#     end_date: '2026-12-31'
+parameters:
+    app.campaigns: {}

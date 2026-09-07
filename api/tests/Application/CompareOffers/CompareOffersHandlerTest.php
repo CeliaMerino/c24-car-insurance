@@ -7,15 +7,19 @@ namespace App\Tests\Application\CompareOffers;
 use App\Application\CompareOffers\CompareOffersHandler;
 use App\Application\CompareOffers\CompareOffersQuery;
 use App\Application\Port\RegisteredPartner;
+use App\Domain\Campaign\Campaign;
 use App\Domain\Comparison\PartnerOutcome;
 use App\Domain\Comparison\PartnerStatus;
 use App\Domain\Offer\Money;
 use App\Domain\Offer\Offer;
 use App\Domain\Offer\PartnerId;
 use App\Domain\Quote\CoverageLevel;
+use App\Domain\Shared\ReferenceDate;
+use App\Infrastructure\CircuitBreaker\InMemoryCircuitBreaker;
 use App\Infrastructure\Partner\ConfigPartnerRegistry;
 use App\Tests\Support\FakeClock;
 use App\Tests\Support\FakePartnerGateway;
+use App\Tests\Support\InMemoryCampaignRepository;
 use App\Tests\Support\InMemoryPartnerRegistry;
 use App\Tests\Support\QuoteRequestBuilder;
 use App\Tests\Support\RecordingMetricsRecorder;
@@ -25,13 +29,115 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * L4. Orchestration: ordering, partial results, a fifth partner, deadline
- * plumbing (specs/06-testing.md sections 3 and 5). Campaigns and the circuit
- * breaker are not in this phase; every registered partner is callable.
+ * L4. Orchestration: ordering, discount-then-sort, partial results, a fifth
+ * partner, deadline plumbing (specs/06-testing.md sections 3 and 5). Breaker
+ * transitions live in CircuitBreakerTest.
  */
 final class CompareOffersHandlerTest extends TestCase
 {
     private const string COMPARISON_ID = '01TESTCOMPARISON00000000000';
+
+    #[Test]
+    public function an_active_campaign_is_applied(): void
+    {
+        $gateway = new FakePartnerGateway([
+            'aurum' => $this->ok('aurum', new Money(56900)),
+        ]);
+        $campaigns = new InMemoryCampaignRepository([
+            'aurum' => $this->campaign('aurum', 15, new ReferenceDate(2026, 1, 1), new ReferenceDate(2026, 8, 31)),
+        ]);
+
+        $comparison = $this->handler(
+            $gateway,
+            [RegisteredPartners::aurum()],
+            campaigns: $campaigns,
+        )->handle($this->query());
+
+        $offer = $comparison->offers[0];
+        self::assertSame(56900, $offer->basePrice->cents());
+        self::assertSame(48365, $offer->finalPrice->cents());
+        self::assertNotNull($offer->discount);
+        self::assertSame(15, $offer->discount->percentage);
+        self::assertSame('CHECK24 pays 15%', $offer->discount->label);
+    }
+
+    #[Test]
+    public function an_expired_campaign_is_not_applied(): void
+    {
+        $gateway = new FakePartnerGateway([
+            'aurum' => $this->ok('aurum', new Money(56900)),
+        ]);
+        $campaigns = new InMemoryCampaignRepository([
+            'aurum' => $this->campaign('aurum', 15, new ReferenceDate(2026, 1, 1), new ReferenceDate(2026, 8, 30)),
+        ]);
+
+        $comparison = $this->handler(
+            $gateway,
+            [RegisteredPartners::aurum()],
+            campaigns: $campaigns,
+        )->handle($this->query());
+
+        $offer = $comparison->offers[0];
+        self::assertSame(56900, $offer->basePrice->cents());
+        self::assertSame(56900, $offer->finalPrice->cents());
+        self::assertNull($offer->discount);
+    }
+
+    #[Test]
+    public function a_campaign_that_has_not_started_is_not_applied(): void
+    {
+        $gateway = new FakePartnerGateway([
+            'aurum' => $this->ok('aurum', new Money(56900)),
+        ]);
+        $campaigns = new InMemoryCampaignRepository([
+            'aurum' => $this->campaign('aurum', 15, new ReferenceDate(2026, 9, 1), new ReferenceDate(2026, 12, 31)),
+        ]);
+
+        $comparison = $this->handler(
+            $gateway,
+            [RegisteredPartners::aurum()],
+            campaigns: $campaigns,
+        )->handle($this->query());
+
+        $offer = $comparison->offers[0];
+        self::assertSame(56900, $offer->finalPrice->cents());
+        self::assertNull($offer->discount);
+    }
+
+    #[Test]
+    public function a_discount_is_applied_before_offers_are_sorted(): void
+    {
+        $gateway = new FakePartnerGateway([
+            'aurum' => $this->ok('aurum', new Money(56900)),
+            'bastion' => $this->ok('bastion', new Money(48600)),
+            'celeris' => $this->ok('celeris', new Money(47800)),
+        ]);
+        $campaigns = new InMemoryCampaignRepository([
+            'aurum' => $this->campaign('aurum', 15, new ReferenceDate(2026, 1, 1), new ReferenceDate(2026, 8, 31)),
+        ]);
+
+        $comparison = $this->handler(
+            $gateway,
+            [RegisteredPartners::aurum(), RegisteredPartners::bastion(), RegisteredPartners::celeris()],
+            campaigns: $campaigns,
+        )->handle($this->query());
+
+        self::assertSame(
+            [
+                ['partner' => 'celeris', 'base' => 47800, 'final' => 47800],
+                ['partner' => 'aurum', 'base' => 56900, 'final' => 48365],
+                ['partner' => 'bastion', 'base' => 48600, 'final' => 48600],
+            ],
+            array_map(
+                static fn (Offer $offer): array => [
+                    'partner' => $offer->partnerId->value,
+                    'base' => $offer->basePrice->cents(),
+                    'final' => $offer->finalPrice->cents(),
+                ],
+                $comparison->offers,
+            ),
+        );
+    }
 
     #[Test]
     public function two_partners_with_the_same_final_price_are_ordered_by_partner_name(): void
@@ -201,13 +307,29 @@ final class CompareOffersHandlerTest extends TestCase
         ?RecordingMetricsRecorder $metrics = null,
         ?ConfigPartnerRegistry $registry = null,
         int $deadlineMs = 3000,
+        ?InMemoryCampaignRepository $campaigns = null,
     ): CompareOffersHandler {
+        $clock = new FakeClock(ReferenceDates::frozen(), stepMs: 5);
+
         return new CompareOffersHandler(
             $registry ?? new InMemoryPartnerRegistry($partners),
+            new InMemoryCircuitBreaker($clock, 3, 30),
             $gateway,
+            $campaigns ?? new InMemoryCampaignRepository(),
             $metrics ?? new RecordingMetricsRecorder(),
-            new FakeClock(ReferenceDates::frozen(), stepMs: 5),
+            $clock,
             $deadlineMs,
+        );
+    }
+
+    private function campaign(string $partnerId, int $percentage, ReferenceDate $start, ReferenceDate $end): Campaign
+    {
+        return new Campaign(
+            new PartnerId($partnerId),
+            $percentage,
+            sprintf('CHECK24 pays %d%%', $percentage),
+            $start,
+            $end,
         );
     }
 

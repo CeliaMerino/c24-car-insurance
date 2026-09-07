@@ -28,4 +28,9 @@ final class FakeClock implements Clock
 
         return $now;
     }
+
+    public function advanceMs(int $milliseconds): void
+    {
+        $this->monotonicMs += $milliseconds;
+    }
 }

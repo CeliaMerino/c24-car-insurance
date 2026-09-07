@@ -6,6 +6,7 @@ namespace App\Domain\Campaign;
 
 use App\Domain\Offer\PartnerId;
 use App\Domain\Shared\ReferenceDate;
+use InvalidArgumentException;
 
 final readonly class Campaign
 {
@@ -16,28 +17,23 @@ final readonly class Campaign
         public ReferenceDate $startDate,
         public ReferenceDate $endDate,
     ) {
+        if ($percentage < 0 || $percentage > 100) {
+            throw new InvalidArgumentException('Campaign percentage must be between 0 and 100.');
+        }
+
+        if (self::compareDate($startDate, $endDate) > 0) {
+            throw new InvalidArgumentException('Campaign end date must be on or after the start date.');
+        }
     }
 
     public function isActiveAt(ReferenceDate $on): bool
     {
-        if ($on->year < $this->startDate->year || $on->year > $this->endDate->year) {
-            return false;
-        }
+        return self::compareDate($on, $this->startDate) >= 0
+            && self::compareDate($on, $this->endDate) <= 0;
+    }
 
-        if ($on->year === $this->startDate->year
-            && ($on->month < $this->startDate->month
-                || ($on->month === $this->startDate->month && $on->day < $this->startDate->day))
-        ) {
-            return false;
-        }
-
-        if ($on->year === $this->endDate->year
-            && ($on->month > $this->endDate->month
-                || ($on->month === $this->endDate->month && $on->day > $this->endDate->day))
-        ) {
-            return false;
-        }
-
-        return true;
+    private static function compareDate(ReferenceDate $a, ReferenceDate $b): int
+    {
+        return [$a->year, $a->month, $a->day] <=> [$b->year, $b->month, $b->day];
     }
 }

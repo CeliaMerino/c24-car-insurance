@@ -16,6 +16,9 @@ final class FakePartnerGateway implements PartnerGateway
     /** @var list<string> */
     public array $calledPartnerIds = [];
 
+    /** @var list<string> */
+    public array $lastCalledPartnerIds = [];
+
     public ?int $deadlineMs = null;
 
     /**
@@ -32,13 +35,20 @@ final class FakePartnerGateway implements PartnerGateway
         return new self(echoOffers: true);
     }
 
+    public function setOutcome(string $partnerId, PartnerOutcome $outcome): void
+    {
+        $this->outcomes[$partnerId] = $outcome;
+    }
+
     public function fetchQuotes(QuoteRequest $request, array $partners, int $deadlineMs): array
     {
         $this->deadlineMs = $deadlineMs;
+        $this->lastCalledPartnerIds = [];
         $results = [];
 
         foreach ($partners as $partner) {
             $this->calledPartnerIds[] = $partner->id->value;
+            $this->lastCalledPartnerIds[] = $partner->id->value;
 
             if ($this->echoOffers) {
                 $results[] = new PartnerOutcome(
