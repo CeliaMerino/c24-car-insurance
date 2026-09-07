@@ -2,9 +2,15 @@
 # (specs/01-product-spec.md section 5.4). One optional campaign per partner.
 # Dates are inclusive calendar days, evaluated against the Clock.
 #
-#   aurum:
-#     percentage: 15
-#     start_date: '2026-01-01'
-#     end_date: '2026-12-31'
+# Default is empty (PRC-8). The Aurum 15% example below is loaded only in
+# dev so a local stack can show a campaign without changing test or prod.
 parameters:
     app.campaigns: {}
+
+when@dev:
+    parameters:
+        app.campaigns:
+            aurum:
+                percentage: 15
+                start_date: '2026-01-01'
+                end_date: '2026-12-31'
