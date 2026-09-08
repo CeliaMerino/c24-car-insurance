@@ -170,7 +170,7 @@ Implement the in-memory circuit breaker from 03-architecture.md section 3.5.
 Per partner. Three consecutive failures to open, half-open after 30 seconds, one
 trial call to close. Timeouts and errors count as failures; skipped does not.
 Open partners are not called and are reported as skipped.
-Add a class-level comment stating that this state is per PHP-FPM worker and that
+Add a class-level comment stating that this state is per FrankenPHP worker and that
 production requires shared state in Redis.
 Write the L4 breaker tests.
 When you finish, list every decision you made that is not stated in the specs.

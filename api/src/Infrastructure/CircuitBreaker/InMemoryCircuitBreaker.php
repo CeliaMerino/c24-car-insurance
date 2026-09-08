@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * In-memory circuit breaker (specs/03-architecture.md section 3.5).
  *
- * This state is per PHP-FPM worker. Each worker keeps its own counters, so
+ * This state is per FrankenPHP worker. Each worker keeps its own counters, so
  * with N workers a partner opens after roughly 3N failures overall and
  * different workers disagree about its state. Production requires shared
  * state in Redis.
