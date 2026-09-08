@@ -211,7 +211,7 @@
 			"response": []
 		},
 		{
-			"name": "api/v1/comparisons 422 - unknow",
+			"name": "api/v1/comparisons 422 - unknown",
 			"request": {
 				"method": "POST",
 				"header": [

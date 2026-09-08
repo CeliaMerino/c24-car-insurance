@@ -1,8 +1,5 @@
 # Architecture Specification
 
-**Status:** Draft
-**Related documents:** `01-product-spec.md`, `04-providers.md`, `05-api-contract.md`, `06-testing.md`, `07-observability.md`
-
 ---
 
 ## 1. Shape of the System
@@ -12,8 +9,8 @@ Three deployable units, one codebase for the two PHP ones.
 ```
 ┌──────────────┐      ┌─────────────────┐      ┌──────────────────┐
 │  Vue SPA     │─────▶│  Symfony API    │─────▶│  Partner         │
-│  (nginx)     │ HTTP │  (php-fpm)      │ HTTP │  Simulator       │
-└──────────────┘      └─────────────────┘      │  (php-fpm)       │
+│  (Vite)      │ HTTP │  (FrankenPHP)   │ HTTP │  Simulator       │
+└──────────────┘      └─────────────────┘      │  (FrankenPHP)    │
                               │                └──────────────────┘
                               ▼
                       ┌──────────────┐
@@ -27,9 +24,9 @@ No database. Nothing is persisted between requests.
 
 The four partners run as a **separate container exposing real HTTP endpoints**, not as in-process PHP classes.
 
-The simulator shares the API's image and codebase, selected by an entrypoint role, so this is one build and two services rather than two projects. It must run in its own container: a Symfony app calling itself through a PHP-FPM pool sized for fewer workers than there are partners will deadlock, and the failure looks like a timeout, which is the hardest kind of bug to attribute.
+The simulator shares the API's image and codebase, selected by `APP_SIMULATOR_ENABLED`, so this is one build and two services rather than two projects. It must run in its own container: a Symfony app calling itself through a worker pool sized for fewer workers than there are partners will deadlock, and the failure looks like a timeout.
 
-`04-providers.md` describes what each partner does. This document describes only how the API calls them.
+`04-providers.md` describes what each partner does.
 
 ---
 
@@ -46,7 +43,9 @@ src/
 │   │                   Usage, AnnualMileage, CoverageLevel
 │   ├── Offer/          Offer, Money, PartnerId
 │   ├── Comparison/     Comparison, PartnerOutcome, PartnerStatus
-│   └── Campaign/       Campaign, Discount
+│   ├── Campaign/       Campaign, Discount
+│   ├── Validation/     ValidationException, ValidationError
+│   └── Shared/         ReferenceDate
 ├── Application/
 │   ├── CompareOffers/  CompareOffersHandler, CompareOffersQuery
 │   └── Port/           PartnerGateway, PartnerRegistry, CircuitBreaker,
@@ -56,7 +55,8 @@ src/
 │   │                   ConfigPartnerRegistry
 │   ├── CircuitBreaker/ InMemoryCircuitBreaker
 │   ├── Campaign/       ConfigCampaignRepository
-│   ├── Http/           ComparisonController, request DTO, response mapper
+│   ├── Http/           ComparisonController, EventsController,
+│   │                   HealthController, MetricsController
 │   └── Observability/  PrometheusMetricsRecorder
 └── Simulator/          SimulatorController, four pricing engines
 ```
@@ -70,7 +70,7 @@ src/
 - `Infrastructure` implements ports and adapts frameworks. It holds no business rules.
 - `Simulator` is not part of the application at all. It is a stand-in for a third party and imports nothing from `Domain` or `Application`.
 
-**The pricing factor tables live in** `Simulator`**, not in the partner adapters.** Pricing is the partner's business, not the platform's, and the adapter's only job is turning an HTTP response into an `Offer` or a failure status. If pricing logic ever appears in `Infrastructure/Partner`, the boundary has been crossed.
+**The pricing factor tables live in** `Simulator`**, not in** `Infrastructure/Partner`**. Pricing is the partner's business, not the platform's, and the gateway's only job is turning an HTTP response into an `Offer` or a failure status. If pricing logic ever appears in `Infrastructure/Partner`, the boundary has been crossed.
 
 ### 2.2 Money
 
@@ -150,7 +150,7 @@ A comparison in which every partner failed is still a successful comparison with
 
 Per partner, in memory, three consecutive failures to open, half-open after 30 seconds, one trial call to close. Timeouts and errors both count as failures; `skipped` does not.
 
-**This state is per PHP-FPM worker.** Each worker keeps its own counters, so with N workers a partner opens after roughly 3N failures overall and different workers disagree about its state.
+**This state is per FrankenPHP worker.** Each worker keeps its own counters, so with N workers a partner opens after roughly 3N failures overall and different workers disagree about its state.
 
 ---
 
@@ -168,8 +168,8 @@ src/
 │   ├── useQuoteForm.ts    form state, validation, step definitions
 │   └── useFormStorage.ts  localStorage read/write, expiry
 ├── components/
-│   ├── form/              one component per step, plus fields
-│   ├── results/           OfferCard, OfferList, skeleton
+│   ├── form/              DriverStep, VehicleStep, CoverageStep, FormField, options
+│   ├── results/           OfferCard, OfferList, OfferSkeleton
 │   └── states/            EmptyResults, RequestError, RestoreNotice
 └── views/
     └── ComparisonView.vue
@@ -179,7 +179,7 @@ Vue 3, TypeScript, Composition API.
 
 ### 4.1 Steps as data
 
-The form's two-then-three step split is a data structure, not a layout:
+The form's three logical steps are a data structure, not a layout:
 
 ```ts
 const steps = [
@@ -189,7 +189,7 @@ const steps = [
 ]
 ```
 
-V1 renders all three on one page. The multi-page funnel renders one at a time behind routes. Validation is already per step, so the funnel is a routing change and a layout change, with no change to state or validation. This is the whole point of ADR-008 and it is the thing to check when reviewing the frontend.
+V1 renders all three on one page. The multi-page funnel renders one at a time behind routes. Validation is already per step, so the funnel is a routing change and a layout change, with no change to state or validation.
 
 ### 4.2 Validation
 
@@ -219,15 +219,13 @@ Rules are declared once, per field, and shared by blur validation and submit val
 
 Every timing value is configuration. None of them is a constant in code, because R3 in the PRD depends on being able to tune the deadline once real latency data exists.
 
-`docker compose up` brings up the SPA, the API, the simulator, Prometheus and Grafana, with the Grafana dashboard provisioned from a file rather than clicked together by hand.
+`docker compose up` brings up the SPA, the API, the simulator, Prometheus and Grafana, with the Grafana dashboard provisioned from a file.
 
 ---
 
 
 
 ## 6. What an Implementation Must Not Do
-
-Failure modes specific enough to check for in review:
 
 - Call partners sequentially, whether by using `NativeHttpClient` or by awaiting each response inside the dispatch loop.
 - Run the simulator with a worker pool smaller than the partner count. Its latency is a plain sleep, which `04-providers.md` section 5.3 permits because each partner call is a separate request served by its own worker; an undersized pool turns those sleeps into a queue, and the symptom is a timeout.

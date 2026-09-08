@@ -1,6 +1,6 @@
 # Car insurance comparison
 
-Symfony API, Vue SPA, and a simulated partner service. Specs in `specs/` are the source of truth.
+Symfony API, Vue SPA, and a simulated partner service. Specs in `specs/` are the source of truth; start at [`specs/00-README.md`](specs/00-README.md).
 
 ## Prerequisites
 

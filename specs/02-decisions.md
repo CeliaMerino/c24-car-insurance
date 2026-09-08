@@ -1,15 +1,11 @@
 # Decision records
 
-Hand-curated decisions that the product notes and the other spec files leave open. Each entry
-states the decision as a rule and, where it changes observable behaviour, its testable
-consequence. Decisions are referenced elsewhere in the repo by their code (e.g. "per ORCH-5").
-
-An implementation built from `specs/` should reproduce these choices. Where the code and the
-architecture diagram disagree, the decision recorded here is the source of truth and the
-divergence is called out explicitly rather than left implicit.
+- **Product ADRs** (`ADR-001`–`ADR-013`) are the product and architecture choices the other spec files cite by those codes. When another specification disagrees with an ADR, the ADR is right.
+- **Implementation decisions** (`DOM-1`, `PRC-1`, `ORCH-5`, and the rest) fill silences those ADRs leave. Where one records a divergence (for example SIM-2), the decision here is the source of truth.
 
 ## Contents
 
+- [Product ADRs](#product-adrs)
 - [Cross-cutting conventions](#cross-cutting-conventions)
 - [1. Domain and validation](#1-domain-and-validation)
 - [2. Pricing and campaigns](#2-pricing-and-campaigns)
@@ -21,9 +17,54 @@ divergence is called out explicitly rather than left implicit.
 - [8. Testing and known gaps](#8-testing-and-known-gaps)
 - [Status](#status)
 
+## Product ADRs
+
+**ADR-001 Scope ends at the results list.** There is no purchase flow, checkout, policy
+issuing, payment, or partner handover.
+
+**ADR-002 Pricing is owned by partners, not by the platform.** Each partner computes its
+own price. The platform validates, dispatches, collects, applies campaign discounts, sorts,
+and returns. Factor tables live in the simulator, never in `Infrastructure/Partner`.
+
+**ADR-003 Car category is a closed enum of four values:** `compact`, `sedan`, `suv`, `van`.
+
+**ADR-004 Annual mileage is captured as a range, not a number.** The four values are
+`under_5k`, `5k_15k`, `15k_30k`, `over_30k`.
+
+**ADR-005 No retries within the deadline.** A partner failure or timeout is final for that
+comparison. `retry_after` on a partner error body is ignored.
+
+**ADR-006 In-memory circuit breaker, with a production caveat.** Opens after three
+consecutive failures per partner and goes half-open after 30 seconds. State is per PHP
+worker, so workers disagree; production requires shared state in Redis.
+
+**ADR-007 Partial results are shown without explanation.** Offers that arrived are listed;
+there is no error banner, partner count, or status text. Zero offers is a distinct empty
+state with a retry action.
+
+**ADR-008 The form is authored as three logical steps, rendered on one page.** The steps
+are driver, vehicle, and coverage. V1 renders all three together so the later multi-page
+funnel is a routing and layout change, not a rewrite of state or validation.
+
+**ADR-009 Form input is persisted to `localStorage` despite containing personal data.**
+Date of birth and postal code are stored under a versioned key with a 24-hour expiry and
+an explicit clear action.
+
+**ADR-010 Frontend state is a composable with `reactive()`, not Pinia.** Form state is
+owned by `useQuoteForm`.
+
+**ADR-011 A comparison returns a single response at the deadline, rather than streaming
+results.** Server-sent events, if they arrive, are a new endpoint alongside this one.
+
+**ADR-012 Prices are annual and in EUR.** Money is integer cents. No other currency.
+
+**ADR-013 Coverage level is a customer input with three fixed tiers**, offered by every
+partner: `third_party`, `third_party_plus`, `comprehensive`. A partner may not decline a
+level in v1.
+
 ## Cross-cutting conventions
 
-These hold across every section below unless a specific decision overrides them.
+These hold unless a specific decision overrides them.
 
 - **Timezone.** All server-side date logic is UTC: `SystemClock`, the simulator clock,
   campaign dates, and date-of-birth checks. The frontend date picker is local, which can
@@ -41,8 +82,7 @@ These hold across every section below unless a specific decision overrides them.
 
 ## 1. Domain and validation
 
-Value objects, layer boundaries, and the field-level validation codes and messages the brief
-does not spell out.
+Value objects, layer boundaries, and the field-level validation codes and messages.
 
 **DOM-1 Reference date as integers.** Domain time is a `ReferenceDate` value object holding
 year/month/day integers passed from the `Clock` port — never a `DateTimeImmutable`, to keep
@@ -62,8 +102,7 @@ validation is testable at L1. Mapping validation errors to HTTP 422 is done in t
 validation so age-boundary and age-calculation tests can construct any date directly. It is
 not used on the request path, where the validated constructor runs.
 
-**DOM-5 Field validation codes and messages.** Codes are the contract; the following messages
-are ours because the brief only exemplifies the postal-code format message:
+**DOM-5 Field validation codes and messages.** Codes are the contract; messages:
 
 - `future_date` → `Date of birth cannot be in the future.`
 - date-of-birth `format` → `Enter a valid date in YYYY-MM-DD format.`
@@ -86,15 +125,13 @@ applied.
 **PRC-1 Money is integer cents, EUR only.** `Money::CURRENCY = 'EUR'`. Prices never use floats
 anywhere in the stack.
 
-**PRC-2 Discount rounding is `PHP_ROUND_HALF_UP`** to the nearest cent. The brief says
-rounding happens in the discount calculation but not which mode.
+**PRC-2 Discount rounding is `PHP_ROUND_HALF_UP`** to the nearest cent.
 
 **PRC-3 A campaign's validity window is inclusive on both the start and the end calendar day**,
 evaluated in UTC.
 
 **PRC-4 A campaign that has not started yet is treated exactly like an expired one** — not
-applied. The brief only names the expired case; this closes the "not yet live" case the same
-way.
+applied.
 
 **PRC-5 The campaign label is derived, not configured.** Config carries only percentage and
 dates. The label is `CHECK24 pays {n}%`, taken from the API contract example. → Config cannot
@@ -107,9 +144,9 @@ drift from the displayed label.
 end is before its start, fails at container boot rather than at request time. → A misconfigured
 campaign cannot reach production silently.
 
-**PRC-8 No campaign is configured in the default environment.** The brief describes the shape,
-not a live campaign; a live campaign is per-environment configuration. → Default responses
-carry `campaign: null`, and existing happy-path tests stay valid.
+**PRC-8 No campaign is configured in the default environment.** A live campaign is
+per-environment configuration. → Default responses carry `campaign: null`, and existing
+happy-path tests stay valid.
 
 **PRC-9 Only `Comparison.offers` are discounted.** `PartnerOutcome` keeps the partner's
 original quoted price, so observability and debugging can still see what the partner actually
@@ -130,8 +167,7 @@ cannot work here: the simulator serves each partner call as a separate request, 
 service-held generator is rebuilt from the seed on every request and every call would draw the
 same outcome. → A given comparison is reproducible regardless of which worker serves it or the
 order the four partners are dispatched in. Trade-off: with a seed set, the same request always
-gets the same behaviour from a partner rather than varying call to call — a narrower reading of
-the brief, chosen for reproducibility. With the seed unset, behaviour is unpredictable per call
+gets the same behaviour from a partner rather than varying call to call. With the seed unset, behaviour is unpredictable per call
 as specified.
 
 **SIM-2 `connection_error` is a truncated response, not a refused connection.** A connection
@@ -150,12 +186,11 @@ reader itself, because a container compiled before the variable was set would ot
 it.
 
 **SIM-5 Dorsal's three failure modes are mutually exclusive.** They are drawn from one number
-in declaration order (8% + 6% + 2% = 16% total). The brief only requires latency and failure to
-be independent of each other.
+in declaration order (8% + 6% + 2% = 16% total). Latency and failure stay independent of each
+other.
 
-**SIM-6 Two invented config shapes.** A per-partner `http_error_status` (aurum 500, the others
-503, default 503), and the spike shape `spike: {probability, latency_ms}`, since the brief only
-ever shows `spike: null`.
+**SIM-6 Two extra config shapes.** A per-partner `http_error_status` (aurum 500, the others
+503, default 503), and the spike shape `spike: {probability, latency_ms}`.
 
 **SIM-7 The simulator clock is split across two locations.** The simulator cannot import
 `Application\Port\Clock`, but nothing outside Infrastructure may construct a date. So the
@@ -165,7 +200,7 @@ outside `src/Simulator`.
 
 **SIM-8 Error responses name the partner actually being called** (not a hard-coded example
 partner). A request body the simulator cannot parse returns 400; an unknown partner returns
-404. Neither status is specified by the brief.
+404.
 
 **SIM-9 Environment reading falls back to `getenv()`.** Symfony's Dotenv deliberately does not
 populate the process environment, and under a web SAPI `$_SERVER` carries no process
@@ -178,8 +213,7 @@ route condition, which would have meant adding `symfony/expression-language` for
 ## 4. Orchestration and resilience
 
 How the comparison fans out to the partners, parses their responses, and stays responsive when
-a partner is slow or failing. The goal the brief sets is that partner problems must not make
-the product feel broken.
+a partner is slow or failing. Partner problems must not make the product feel broken.
 
 **ORCH-1 Duration is measured with `Clock::monotonicMs()`** so Application never calls
 `time()`. The gateway measures its own timings with `hrtime()` directly, since it is
@@ -220,31 +254,31 @@ each gets its own trial call in the same comparison.
 `Clock::monotonicMs()`. `CIRCUIT_BREAKER_COOLDOWN_S` is converted to milliseconds (× 1000).
 
 **ORCH-11 A failed half-open trial reopens the breaker immediately and starts a new cooldown.**
-The brief only says one successful trial closes the breaker; staying half-open would allow
-another trial on the next comparison without waiting, so a failed trial re-opens instead.
+Staying half-open would allow another trial on the next comparison without waiting, so a failed
+trial re-opens instead.
 
-**ORCH-12 While closed, an `ok` resets the consecutive-failure count.** This follows from
-"consecutive", though the reset rule is not written down.
+**ORCH-12 While closed, an `ok` resets the consecutive-failure count.**
 
 **ORCH-13 `skipped` outcomes are a breaker no-op.** The handler reports them to the breaker,
 which neither opens, closes, nor resets a cooldown on them. A skipped partner's `duration_ms`
 is `0`.
 
-**ORCH-14 Breaker state lives on the service instance, not in statics.** Caveat: under PHP-FPM
-each request builds a new container, so counters do not actually survive across HTTP requests
-today — a shared store (Redis) is required for real cross-request breaking. This is recorded in
-the class comment; the L4 tests reuse a single instance to exercise the state machine.
+**ORCH-14 Breaker state lives on the service instance, not in statics.** Caveat: under
+FrankenPHP the state is per worker, so with N workers a partner opens after roughly 3N
+failures overall and different workers disagree about its state. A shared store (Redis) is
+required for consistent cross-worker breaking. This is recorded in the class comment; the L4
+tests reuse a single instance to exercise the state machine.
 
 ## 5. API contract
 
 The HTTP envelope: how malformed requests and validation failures are shaped, how errors are
 ordered, and what the health and metrics endpoints return. Validation *codes* for individual
-fields are in DOM-5; this section covers the request envelope and the response shapes.
+fields are in DOM-5.
 
 **API-1 Malformed requests are RFC 9457 `problem+json`** with
 `type: https://check24.example/problems/malformed-request`, `title: Malformed request`,
 `status: 400`, and a `detail` string. Validation failures use HTTP 422 with the same
-`problem+json` envelope. The contract describes *when* 400 happens but not the body.
+`problem+json` envelope.
 
 **API-2 A JSON body that is not an object** (`[]`, `"x"`, `true`) is a 400, not a 422.
 
@@ -253,7 +287,7 @@ fields are in DOM-5; this section covers the request envelope and the response s
 **API-4 `application/json; charset=utf-8` is accepted** — only the media type before the `;` is
 compared.
 
-**API-5 Request-envelope validation codes and messages** (invented English; the frontend keys
+**API-5 Request-envelope validation codes and messages** (the frontend keys
 on the code):
 
 - `required` fires only when a field is absent or null. An empty string is **not** `required`.
@@ -268,12 +302,11 @@ payload order. → Error output is deterministic for tests.
 **API-7 `comparison_id` is a Symfony ULID.** Its timestamp comes from the system clock, not the
 `Clock` port. It is omitted from 400 and 422 bodies.
 
-**API-8 Health.** `GET /health` returns `{"status":"ok"}` — the "minimal body" the spec asks
-for.
+**API-8 Health.** `GET /health` returns `{"status":"ok"}`.
 
 **API-9 `GET /metrics` has no auth.** "Not exposed publicly" is treated as a deployment concern
 (network / ingress), not an application concern. The metric payload itself is defined in
-section 7.
+`07-observability.md`.
 
 **API-10 `Cache-Control` on comparison responses is `no-store, private`.** Symfony's
 `ResponseHeaderBag` appends `private` unless `public`/`private` is already set; the `no-store`
@@ -281,22 +314,20 @@ directive is present.
 
 ## 6. Frontend
 
-Serving, how the form survives a reload, how results and errors are presented, and the copy the
-brief leaves open. The form is kept simple but must not block a later multi-page funnel.
+Serving, how the form survives a reload, how results and errors are presented, and the UI copy.
+The form is kept simple but must not block a later multi-page funnel.
 
-**FE-1 Served by Vite on port 5173.** This matches the existing compose mapping; the
-architecture diagram's nginx is not used for the exercise. (Divergence recorded above.)
+**FE-1 Served by Vite on port 5173.** The SPA is not fronted by nginx.
 
 **FE-2 The browser calls `/api/v1`; Vite proxies to the API** (`API_PROXY_TARGET`).
 `VITE_API_BASE_URL` is `/api/v1` (changed from an absolute `localhost:8000`) so CORS does not
-have to be added to the API, which the brief does not specify.
+have to be added to the API.
 
 **FE-3 Date-of-birth / "today" checks use UTC**, matching the API clock. This can disagree with
 the date picker's local day near midnight — accepted.
 
 **FE-4 Form-persistence payload** is `{ version: 1, savedAt, values }` under the key
-`c24-comparison-form-v1`. The brief asks for a versioned key and a timestamp; the inner
-`version` field is ours.
+`c24-comparison-form-v1`.
 
 **FE-5 Restore window and empty handling.** Stored input is restored only while under 24h old;
 at ≥ 24h it is stale. All-empty payloads are never restored and show no notice. A change that
@@ -304,11 +335,9 @@ leaves every field empty clears storage instead of writing blanks. Hydrating fro
 not refresh `savedAt`. → The customer's input surviving a reload never surprises them with
 stale or empty state.
 
-**FE-6 Prices render as `€1,234.00 / year`** from integer cents, no float. Locale and grouping
-were unspecified; this is the chosen format.
+**FE-6 Prices render as `€1,234.00 / year`** from integer cents, no float.
 
-**FE-7 Results versus form.** A "Change details" control returns to the form (the brief says
-the customer goes back but does not name the control). Whether results are full or partial is a
+**FE-7 Results versus form.** A "Change details" control returns to the form. Whether results are full or partial is a
 data-state derived from the partner statuses; the offer list looks the same either way
 (ADR-007).
 
@@ -318,34 +347,28 @@ below. A 400 and any non-422 failure are handled like a 5xx or network error.
 **FE-9 The commercial-use / garage field's client rule is "required" only.** The API's `format`
 code for this field exists for a non-boolean JSON type that the form cannot produce.
 
-**FE-10 Campaign UI is rendered on the offer cards** (brief §5.4) even though applying
-campaigns is a later phase. The client only renders `campaign` when it is present in the
+**FE-10 Campaign UI is rendered on the offer cards.** The client only renders `campaign` when it is present in the
 response.
 
 **FE-11 "Clear saved details" resets both the form and storage**, not storage alone.
 
-**FE-12 The loading state shows four skeleton cards**, one per partner. The count was
-unspecified.
+**FE-12 The loading state shows four skeleton cards**, one per partner.
 
 **FE-13 A frozen `now()` is injected into `useQuoteForm` and `useFormStorage`** for the L7
 clock test. The architecture tree has no frontend Clock, so this is an injected function rather
 than a port.
 
-**FE-14 UI copy is ours** — the heading, the restore notice, the empty and error states, the
-buttons, and the field labels. The brief gives only coverage meanings and mileage ranges.
+**FE-14 UI copy** covers the heading, the restore notice, the empty and error states, the
+buttons, and the field labels.
 
-**FE-15 Files and layout beyond the architecture tree.** `options.ts` and `FormField.vue` are
-extra files relative to the tree. Coverage cards are three columns above 768px (the spec only
-says the form may use two columns). A misplaced `api/frontend` Vite template was removed so the
-API image does not ship a second SPA.
+**FE-15 Layout.** Coverage cards are three columns above 768px. A misplaced `api/frontend` Vite template was removed so the API image does not ship a second SPA.
 
 ## 7. Observability
 
-The senior-profile observability layer: the events endpoint, how metrics are labelled, when the
-no-traffic alert fires, and how faults are logged. The point is to tell whether the comparison
-is healthy after launch, not to measure for its own sake.
+The events endpoint, how metrics are labelled, when the no-traffic alert fires, and how faults
+are logged — so the team can tell whether the comparison is healthy after launch.
 
-**OBS-1 `POST /api/v1/events` returns 204 on success.** The status was not specified.
+**OBS-1 `POST /api/v1/events` returns 204 on success.**
 
 **OBS-2 An unknown event type returns `problem+json` 422**, the same envelope as comparison
 validation (API-1).
@@ -367,8 +390,8 @@ exists. → Every fault line still has the field, so log queries never break on 
 
 ## 8. Testing and known gaps
 
-How the test harness is wired, and which scenarios are deliberately not covered yet and why.
-See `06-testing.md` for the level definitions (L1–L7).
+How the test harness is wired, and which scenarios are not covered yet and why.
+See `06-testing.md` for the level definitions (L1–L9).
 
 ### Test-harness decisions
 
@@ -389,20 +412,15 @@ in-memory instances that the assertions could not then read.
 
 ### Known gaps
 
-Deliberately out of scope for now, each with its reason so a reviewer (or an implementation
-agent) does not read them as oversights.
-
 **GAP-1 No L5 for an active campaign being applied.** The testing map assigns that scenario to
 both L4 (covered) and L5. An L5 would need either a default campaign — which would change the
-existing happy-path assertions (see PRC-8) — or a per-test config override, neither of which is
-specified.
+existing happy-path assertions (see PRC-8) — or a per-test config override.
 
 **GAP-2 No L5 for a partner `skipped` by the circuit breaker.** Covered at L4; the L5 version
 maps to a "partner known to be down" scenario in `06-testing.md` and is left for that work.
 
 **GAP-3 Observability replaced an earlier stub.** Metrics were a stub through the API phase and
-became real in the observability phase; any earlier stub-era detail is superseded by section 7,
-which is the current contract.
+became real in the observability phase. The contract is `07-observability.md`.
 
 ## Status
 

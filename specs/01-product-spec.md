@@ -1,9 +1,5 @@
 # Product Requirements Document — Car Insurance Comparison
 
-**Status:** Draft
-**Owner:** Celia Merino Valladolid
-**Related documents:** `02-decisions/` (ADRs), `03-architecture.md`, `04-providers.md`, `05-api-contract.md`, `06-testing.md`, `07-observability.md`
-
 ---
 
 ## 1. Introduction and Objectives
@@ -14,14 +10,7 @@ A customer looking for car insurance today has to visit each insurer separately,
 
 This product gives the customer one short form and one screen of comparable offers, retrieved from several insurance partners at once.
 
-### 1.2 Purpose of this document
-
-This PRD defines **what** the product does and **why**. It is written to be read in two ways:
-
-- By a human reviewer, to understand the product decisions and the tradeoffs behind them.
-- By an AI implementation agent, as the source of functional truth. Where a decision is not stated here, it is stated in an ADR under `02-decisions/` and linked from the relevant section.
-
-### 1.3 Objectives
+### 1.2 Objectives
 
 
 | #   | Objective                                                                         | How we know we met it                                                                                                                             |
@@ -29,15 +18,13 @@ This PRD defines **what** the product does and **why**. It is written to be read
 | O1  | The customer gets comparable offers from several partners in a single interaction | A submitted form returns offers from multiple partners on one screen, in one price format, all quoted at the coverage level the customer selected |
 | O2  | The experience stays usable when partners misbehave                               | A comparison in which some partners fail still returns offers, within the global deadline                                                         |
 | O3  | The customer never loses form input to a page reload                              | Input is restored after a reload, with the customer aware it was restored                                                                         |
-| O4  | Adding a new partner does not require changing the comparison logic               | A new partner is added by adding one adapter and one configuration entry                                                                          |
+| O4  | Adding a new partner does not require changing the comparison logic               | A new partner is added by adding one simulator pricing engine and configuration entries, with no change to comparison logic |
 | O5  | The team can tell whether the comparison is healthy after launch                  | Latency, partner health and funnel metrics are visible on a dashboard from day one                                                                |
 
 
 
 
-### 1.4 Non-goals
-
-Explicit exclusions. An implementation agent must not add these, and must not add plausible neighbours of these.
+### 1.3 Non-goals
 
 - **Real tariffs.** Prices are simulated. No actuarial model, no real risk calculation.
 - **Legal and regulatory compliance.** No IDD requirements, no pre-contractual information, no policy documents.
@@ -53,8 +40,6 @@ Explicit exclusions. An implementation agent must not add these, and must not ad
 
 
 ## 2. Stakeholders
-
-Some of these are notional for the exercise.
 
 
 | Stakeholder         | Interest                                                                 | Consequence in this product                                                   |
@@ -106,7 +91,7 @@ Version 1 is a single route with three view states.
    └── State C: Results       (offers, or the empty state)
 ```
 
-The form is authored as **two logical steps rendered on one page**, so that the later multi-page funnel is a routing and layout change rather than a rewrite. See ADR-008.
+The form is authored as **three logical steps rendered on one page**, so that the later multi-page funnel is a routing and layout change rather than a rewrite. See ADR-008.
 
 ```
 Step 1 — Driver      date of birth, postal code
@@ -314,7 +299,7 @@ Scenario: A partner known to be down does not consume the deadline
 Scenario: Input is restored after a reload
   Given I have filled in five of the seven fields
   When I reload the page
-  Then those four fields contain my previous values
+  Then those five fields contain my previous values
   And I see a notice that my input was restored
 ```
 
@@ -389,11 +374,11 @@ Scenario: The results are usable on a narrow viewport
 
 ### US-07 — Add a partner without touching the core
 
-> As an engineer, I want to add a partner by adding an adapter, so that partner growth does not destabilise the comparison.
+> As an engineer, I want to add a partner by adding a simulator pricing engine and configuration, so that partner growth does not destabilise the comparison.
 
 ```gherkin
 Scenario: A fifth partner is added
-  Given I add one adapter class and one configuration entry
+  Given I add one simulator pricing engine and one configuration entry on each of the API and the simulator
   When I run the full test suite
   Then no existing test requires modification
   And the new partner appears in the comparison
@@ -438,8 +423,6 @@ The wait can reach three seconds, which is long enough to need feedback. A skele
 
 ### 7.3 States to implement
 
-Every one of these must exist.
-
 
 | State           | Trigger                        | What the customer sees                          |
 | --------------- | ------------------------------ | ----------------------------------------------- |
@@ -459,21 +442,19 @@ Every one of these must exist.
 
 ## 8. Technical Requirements
 
-Summary only. The binding detail is in `03-architecture.md` and `05-api-contract.md`.
-
 
 | Area              | Requirement                                                              |
 | ----------------- | ------------------------------------------------------------------------ |
 | Backend           | Symfony, PHP 8.3+                                                        |
 | Frontend          | Vue 3, TypeScript, Composition API, separate SPA                         |
 | Frontend state    | Composable with `reactive()`. Not Pinia in v1. See ADR-010.              |
-| Partner isolation | One port, one adapter per partner, resolved from configuration           |
+| Partner isolation | One port, one HTTP gateway, partners resolved from configuration         |
 | Concurrency       | Partners are called concurrently, not sequentially                       |
 | Determinism       | Partner failure and latency are seedable, so tests are repeatable        |
 | API               | REST, JSON, single comparison endpoint                                   |
 | Observability     | Prometheus metrics endpoint, Grafana dashboard, both in `docker-compose` |
 | Persistence       | None. No database.                                                       |
-| Environment       | `docker compose up` brings up backend, frontend, Prometheus and Grafana  |
+| Environment       | `docker compose up` brings up the SPA, the API, the simulator, Prometheus and Grafana |
 
 
 ---
@@ -481,8 +462,6 @@ Summary only. The binding detail is in `03-architecture.md` and `05-api-contract
 
 
 ## 9. Success Metrics
-
-The point of each metric is the decision it triggers.
 
 ### 9.1 Product
 
@@ -512,6 +491,8 @@ Average latency is **not** a target. It hides the tail that the timeout and dead
 
 ### 9.3 Reliability
 
+Alert conditions that page or notify are in `07-observability.md`.
+
 
 | Metric                      | Target            | Action if breached                                                             |
 | --------------------------- | ----------------- | ------------------------------------------------------------------------------ |
@@ -534,14 +515,14 @@ Average latency is **not** a target. It hides the tail that the timeout and dead
 | R3  | The 3-second deadline may exclude a healthy but slow partner                             | A legitimate offer is lost, and the customer never knows  | Per-partner latency is measured; the deadline is a tunable configuration value, not a constant |
 | R4  | Simulated partners are too well-behaved to prove resilience                              | Failure handling looks correct but is untested            | Failure profiles are explicit and seeded; each failure mode has a dedicated test               |
 | R5  | Concurrency in PHP is more constrained than in the runtimes this pattern usually assumes | Partner calls degrade to sequential and blow the deadline | Concurrency approach is fixed in `03-architecture.md` and verified by a timing test            |
-| R6  | Observability scope grows without limit                                                  | Time is taken from the comparison itself                  | Only the metrics in section 9 are implemented; each has a stated action                        |
+| R6  | Observability scope grows without limit                                                  | Time is taken from the comparison itself                  | Only the metrics in `07-observability.md` are implemented; each has a stated action |
 
 
 
 
 ### Dependencies
 
-- No external service dependencies. Partners are simulated in-process.
+- No external service dependencies. Partners are simulated as a separate HTTP service in their own container (`03-architecture.md` section 1.1).
 - Docker and Docker Compose are required to run the full stack including observability.
 
 ---
@@ -550,13 +531,13 @@ Average latency is **not** a target. It hides the tail that the timeout and dead
 
 ## 11. Implementation Phases
 
-Ordering for the implementation agent. Each phase must be verifiable before the next begins.
+Each phase must be verifiable before the next begins.
 
 1. **Domain and contracts.** Quote request, offer, partner port, validation rules. Unit tested with no infrastructure.
-2. **Simulated partners.** Four adapters with distinct pricing weights and failure profiles, seeded for determinism.
+2. **Simulated partners.** Four simulated partners with distinct pricing weights and failure profiles, seeded for determinism.
 3. **Comparison orchestration.** Concurrency, timeouts, deadline, per-partner status.
 4. **API layer.** Endpoint, request validation, response shape, error format.
-5. **Frontend.** Form with two logical steps, all eight states from section 7.3, persistence.
+5. **Frontend.** Form with three logical steps, all eight states from section 7.3, persistence.
 6. **Campaigns.** Configuration, application, presentation.
 7. **Circuit breaker.** Added last; the comparison must meet its deadline without it first.
 8. **Observability.** Metrics, Prometheus, Grafana dashboard.
@@ -585,6 +566,8 @@ See section 4.2 for domain concepts. Additional terms:
 
 ### 12.2 Decision index
 
+See `02-decisions.md`.
+
 
 | ADR     | Decision                                                                            |
 | ------- | ----------------------------------------------------------------------------------- |
@@ -595,7 +578,7 @@ See section 4.2 for domain concepts. Additional terms:
 | ADR-005 | No retries within the deadline                                                      |
 | ADR-006 | In-memory circuit breaker, with production caveat                                   |
 | ADR-007 | Partial results are shown without explanation                                       |
-| ADR-008 | Form is authored in two logical steps, rendered on one page                         |
+| ADR-008 | Form is authored in three logical steps, rendered on one page                       |
 | ADR-009 | Form input persisted to `localStorage` despite containing personal data             |
 | ADR-010 | Composable with `reactive()` instead of Pinia                                       |
 | ADR-011 | Single response at deadline rather than streaming results                           |
@@ -606,8 +589,6 @@ See section 4.2 for domain concepts. Additional terms:
 
 
 ### 12.3 Open questions taken as assumptions
-
-Questions that would go to a product manager in a real project, and the assumption taken instead.
 
 
 | Question                                                               | Assumption taken                                                              |

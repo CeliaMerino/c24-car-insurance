@@ -1,8 +1,5 @@
 # API Contract
 
-**Status:** Draft
-**Related documents:** `01-product-spec.md`, `03-architecture.md`, `04-providers.md`, [`c24-api.postman_collection.json`](c24-api.postman_collection.json) (runnable examples; this document is the contract)
-
 ---
 
 ## 1. Conventions
@@ -14,7 +11,7 @@
 - Errors use `application/problem+json` (RFC 9457).
 - Every response carries `Cache-Control: no-store`. Comparisons contain personal input and are never cacheable.
 
-Runnable examples of the requests below are in [`c24-api.postman_collection.json`](c24-api.postman_collection.json). Import the file in Postman. If the collection and this document disagree, this document is right.
+Runnable examples of the requests below are in [`c24-api.postman_collection.json`](c24-api.postman_collection.json). If the collection and this contract disagree, the contract is right.
 
 ---
 
@@ -153,9 +150,11 @@ Every invalid field is reported in one response. The API never stops at the firs
 
 Body is not valid JSON, or `Content-Type` is not `application/json`. Distinct from 422: 400 means the request could not be read, 422 means it was read and its contents are wrong.
 
+The body is RFC 9457 `problem+json` with `type` `https://check24.example/problems/malformed-request`, `title` `Malformed request`, `status` 400, and a `detail` string. See `02-decisions.md` API-1.
+
 ### 2.6 Response — 500
 
-The API itself failed. This status is reserved for platform faults and must never be produced by a partner failure. The distinction is load-bearing for the `Backend 5xx rate` alert in `07-observability.md`.
+The API itself failed. This status is reserved for platform faults and must never be produced by a partner failure, so the `Backend 5xx rate` alert in `07-observability.md` is not poisoned by partner outages.
 
 ---
 
@@ -165,8 +164,9 @@ The API itself failed. This status is reserved for platform faults and must neve
 |---|---|
 | `GET /health` | Liveness. 200 and a minimal body. Does not call partners. |
 | `GET /metrics` | Prometheus exposition format. Not exposed publicly. |
+| `POST /api/v1/events` | Frontend funnel events. Defined in `07-observability.md` section 3.2. Returns 204 on success; unknown event types return 422. |
 
-`GET /health` deliberately does not check partner reachability. A health check that fails because a third party is down will get the API restarted for someone else's outage.
+`GET /health` does not check partner reachability. A health check that fails because a third party is down will get the API restarted for someone else's outage.
 
 ---
 

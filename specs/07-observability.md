@@ -1,11 +1,8 @@
 # Observability Specification
 
-**Status:** Draft
-**Related documents:** `01-product-spec.md` section 9, `03-architecture.md`, `05-api-contract.md`, `06-testing.md`, [`c24-api.postman_collection.json`](c24-api.postman_collection.json)
-
 ---
 
-## 1. What This Is For
+## 1. Four questions
 
 After launch the team needs to answer four questions in under a minute:
 
@@ -14,9 +11,9 @@ After launch the team needs to answer four questions in under a minute:
 3. Which partner is the problem?
 4. Are customers getting through the form?
 
-Everything specified below exists to answer one of those. A metric that answers none of them is not implemented, however easy it would be to emit.
+A metric that answers none of them is not implemented.
 
-Each metric in section 3 states the action it triggers. That column is the point of the document. A metric with no action attached is a number nobody reads twice.
+A metric with no action attached is a number nobody reads twice.
 
 ---
 
@@ -28,7 +25,7 @@ The client library must therefore use a shared storage adapter. `promphp/prometh
 
 This is the same class of problem as the circuit breaker's per-worker state (ADR-006), and it has the same shape of consequence: the naive implementation looks correct in a single-worker test environment and is wrong under load.
 
-An implementation that registers metrics in a plain in-memory registry has a bug, not a simplification.
+An implementation that registers metrics in a plain in-memory registry has a bug.
 
 ---
 
@@ -85,7 +82,7 @@ c24_comparison_offers:
   0, 1, 2, 3, 4
 ```
 
-The 2.0 and 3.0 boundaries are deliberate. They make "how many comparisons hit the per-partner timeout" and "how many hit the global deadline" single bucket queries rather than estimates.
+The 2.0 and 3.0 boundaries make "how many comparisons hit the per-partner timeout" and "how many hit the global deadline" single bucket queries rather than estimates.
 
 ### 3.4 Cardinality
 
@@ -106,7 +103,7 @@ Structured JSON through Monolog. One line is not prose with numbers in it; it is
 | WARNING | Circuit breaker opens or closes | `comparison_id`, `partner`, `new_state` |
 | ERROR | Platform fault only | `comparison_id`, exception, stack trace |
 
-**Never logged:** date of birth, postal code, or any other field of the quote request. Coverage level is fine, since it is not personal. This is not incidental tidiness — the same reasoning is in R2 and ADR-009, and a log aggregator is a much longer-lived store than `localStorage`.
+**Never logged:** date of birth, postal code, or any other field of the quote request. Coverage level is fine, since it is not personal. The same reasoning is in R2 and ADR-009, and a log aggregator is a much longer-lived store than `localStorage`.
 
 A partner failure is a WARNING and never an ERROR. If partner failures log at ERROR, the error log stops being a signal within a day.
 
@@ -114,7 +111,7 @@ A partner failure is a WARNING and never an ERROR. If partner failures log at ER
 
 ## 5. Alerts
 
-Five. Each one names what the person receiving it should do, because an alert that does not is a notification.
+Five. Each one names what the person receiving it should do.
 
 | Alert | Condition | For | Severity | Do this |
 |---|---|---|---|---|
@@ -124,7 +121,7 @@ Five. Each one names what the person receiving it should do, because an alert th
 | Platform errors | 5xx rate > 0.5% | 5m | critical | Page on-call. This is ours, not a partner's. |
 | No traffic | `c24_comparisons_total` flat during business hours | 15m | critical | Nothing is failing, which is the point. A deploy has broken the form or the SPA cannot reach the API. |
 
-The last one is the one that gets left out and the one that catches the worst outage. Every other alert fires because something is going wrong; this one fires because nothing at all is happening, which no error-rate metric can detect.
+The last one fires because nothing at all is happening, which no error-rate metric can detect.
 
 Alert rules live in `ops/prometheus/rules.yml`, in the repository, reviewed like code.
 
@@ -163,7 +160,7 @@ ops/grafana/provisioning/dashboards/dashboards.yml
 ops/grafana/dashboards/comparison.json
 ```
 
-Anonymous access with Admin role is enabled in `docker-compose.yml` so a reviewer can open the dashboard without credentials. That is a deliberate choice for an evaluation environment and is called out in the README as unsuitable for production.
+Anonymous access with Admin role is enabled in `docker-compose.yml` so the dashboard can be opened without credentials. That setting is unsuitable for production.
 
 ### 6.3 Dashboard layout
 
@@ -193,8 +190,6 @@ Row 2 shows percentiles and no average. An average of 1.1s can hide that one com
 ---
 
 ## 7. Using It Daily
-
-The metrics exist to be acted on, so the routine is part of the specification.
 
 **Every morning, three questions, five minutes.** Row 1 for whether yesterday looked like the day before. Row 3 for whether any partner's success rate is drifting down rather than falling off a cliff, since drift is what nobody notices. Row 4 for whether one validation field has started dominating, which usually means a copy change went out.
 

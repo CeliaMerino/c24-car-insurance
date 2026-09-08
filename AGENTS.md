@@ -4,19 +4,21 @@ Car insurance comparison. A Symfony API, a Vue SPA, and a simulated partner serv
 
 ## Source of truth
 
-`specs/` is the specification. It is hand-written and authoritative.
+`specs/` is the specification.
 
 - When the code and a specification disagree, the specification is right and the code is a bug.
-- When a specification and an ADR in `specs/02-decisions/` disagree, the ADR is right.
+- When a specification and an ADR in `specs/02-decisions.md` disagree, the ADR is right.
 - Do not invent product or architectural decisions. If something is not specified, say so rather than choosing.
 
-Read in this order:
+The index and reading order are in `specs/00-README.md`. Read in this order:
 
 1. `specs/01-product-spec.md` — what the product does and why
-2. `specs/03-architecture.md` — structure, concurrency, layer rules
-3. `specs/04-providers.md` — the four simulated partners
-4. `specs/05-api-contract.md` — the HTTP contract
-5. `specs/06-testing.md` — what is tested and at which level
+2. `specs/02-decisions.md` — product ADRs and implementation decisions
+3. `specs/03-architecture.md` — structure, concurrency, layer rules
+4. `specs/04-providers.md` — the four simulated partners
+5. `specs/05-api-contract.md` — the HTTP contract
+6. `specs/06-testing.md` — what is tested and at which level
+7. `specs/07-observability.md` — metrics, logs, alerts, dashboard
 
 ## Layout
 

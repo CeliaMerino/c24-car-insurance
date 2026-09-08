@@ -1,17 +1,14 @@
 # Partner Specification
 
-**Status:** Draft
-**Related documents:** `01-product-spec.md`, `03-architecture.md`, `05-api-contract.md`, `06-testing.md`, `02-decisions/ADR-002`, `02-decisions/ADR-006`
-
 ---
 
 ## 1. Scope
 
-This document specifies the four insurance partners: how each one prices a quote request, how each one misbehaves, and how both are made deterministic for testing.
+The four insurance partners: how each one prices a quote request, how each one misbehaves, and how both are made deterministic for testing.
 
 Partners are simulated inside the project, but they are real HTTP services in their own container (`03-architecture.md`, section 1.1). Every failure mode below is an actual HTTP response rather than a simulated one, and replacing a simulated partner with a real insurer is a change of URL and response mapping, with no effect on the comparison logic.
 
-Two rules govern everything below.
+Two rules:
 
 - **Pricing is deterministic.** The same quote request always yields the same price from the same partner. Nothing about the price is random.
 - **Behaviour is random but reproducible.** Latency and failure vary from call to call in normal operation, and repeat exactly under a fixed seed.
@@ -57,7 +54,7 @@ Money is transported as an integer number of cents. No floating point crosses th
 
 ### 2.3 Outcome mapping
 
-The adapter maps every partner outcome to exactly one status, which the API returns per partner and the observability layer counts.
+The HTTP gateway maps every partner outcome to exactly one status, which the API returns per partner and the observability layer counts.
 
 
 | Status    | Cause                                                                                    |
@@ -92,7 +89,7 @@ Age is calculated from `date_of_birth` against the request date. The clock must 
 
 ### 3.1 Aurum Direct — `aurum`
 
-The complete underwriter. Uses every factor, weights nothing extremely, fails rarely. It is the baseline the others are read against.
+The complete underwriter. Uses every factor, weights nothing extremely, fails rarely.
 
 
 | Factor   | Values                                                            |
@@ -176,7 +173,7 @@ Latency and failure are drawn per call. Probabilities are independent: a call ma
 | Partner   | Normal latency | Spike                          | Failure modes                                      |
 | --------- | -------------- | ------------------------------ | -------------------------------------------------- |
 | `aurum`   | 80–250 ms      | none                           | 1% HTTP 500                                        |
-| `bastion` | 1.200–1.900 ms | none                           | 2% connection refused                              |
+| `bastion` | 1.200–1.900 ms | none                           | 2% connection error (truncated response, SIM-2)    |
 | `celeris` | 100–300 ms     | 15% of calls at 2.500–4.500 ms | 3% HTTP 503                                        |
 | `dorsal`  | 200–600 ms     | none                           | 8% HTTP 503 · 6% malformed body · 2% non-JSON body |
 
@@ -184,7 +181,7 @@ Latency and failure are drawn per call. Probabilities are independent: a call ma
 Each partner exercises a different failure shape, so that no single defensive mechanism covers all four:
 
 - `bastion` **is always slow.** It never times out on its own, but it sits close enough to the 2.000 ms cut that any added load drops it out of the comparison. It is also the cheapest partner at third-party level, which makes its absence commercially visible rather than merely technical.
-- `celeris` **is fast until it is not.** Its spikes exceed the per-partner timeout, so it exercises the timeout path without ever being reliably broken. A partner that fails only 15% of the time is harder to detect than one that fails always, which is the point.
+- `celeris` **is fast until it is not.** Its spikes exceed the per-partner timeout, so it exercises the timeout path without ever being reliably broken. A partner that fails only 15% of the time is harder to detect than one that fails always.
 - `dorsal` **breaks the contract rather than the connection.** Its malformed and non-JSON responses exercise the parsing and schema-validation path.
 - `aurum` **fails rarely.** A partner that never fails would let an implementation hard-code it as a fallback.
 
@@ -212,7 +209,9 @@ Adapters must be tested against these exact shapes.
 <html><body><h1>502 Bad Gateway</h1></body></html>
 ```
 
-The `retry_after` field is present deliberately and is **ignored**. The system does not retry (ADR-005). An implementation that starts honouring it has changed a documented decision.
+**Connection error** — HTTP 200 declaring `Content-Length: 1024` with an empty body. A connection cannot be refused once accepted, so this truncated transfer is the failure shape (SIM-2). The client sees a transport error rather than an HTTP response.
+
+The `retry_after` field is present and is **ignored**. The system does not retry (ADR-005).
 
 ---
 
@@ -226,8 +225,8 @@ Acceptance criteria need a partner to time out, or return a malformed body, on d
 
 A `PARTNER_SIMULATION_SEED` configuration value seeds the generator used for latency and failure.
 
-- **Set:** behaviour is fully reproducible. The same seed and the same sequence of requests produce the same sequence of outcomes.
-- **Unset:** the seed is random per process. This is the dev and demo mode, where partner problems should be surprising.
+- **Set:** behaviour is fully reproducible. The same seed, partner, and request produce the same outcome (SIM-1: seeding is per call, not per process).
+- **Unset:** behaviour is unpredictable per call. This is the dev and demo mode, where partner problems should be surprising.
 
 The seed never touches pricing. A seed change must not alter a single price.
 
@@ -245,9 +244,9 @@ This is what acceptance tests use. It is a test seam, not a feature: it is avail
 
 The simulator may implement latency as a plain sleep in its request handler, because each partner call is a separate HTTP request served by its own worker process. Two constraints follow from that.
 
-The simulator's worker pool must be sized for at least as many concurrent requests as there are partners. A pool smaller than four turns concurrent calls into a queue, and the symptom is a timeout, which is the hardest failure to attribute correctly.
+The simulator's worker pool must be sized for at least as many concurrent requests as there are partners. A pool smaller than four turns concurrent calls into a queue, and the symptom is a timeout.
 
-The API must dispatch concurrently. The mechanism is fixed in `03-architecture.md`; this document requires only that a timing test asserts four partners at 1.500 ms each resolve in under 2.000 ms of wall clock.
+The API must dispatch concurrently. The mechanism is in `03-architecture.md`. Four partners at 1.500 ms each must resolve in under 2.000 ms of wall clock.
 
 ---
 
@@ -305,7 +304,7 @@ Pinned to a reference date of **2026-08-31**. Prices are in euros, before any ca
 | `bastion` | 360 × 1.00 × 1.35 × 1.45 × 1.40 × 1.00 × 1.00 × 1.95 | **€1.924** |
 
 
-**The ordering fully inverts between the two vectors.** `bastion` moves from second-cheapest to most expensive and `dorsal` from most expensive to cheapest. Both vectors are mandatory regression tests: if a factor table is edited carelessly, this inversion is what breaks first.
+**The ordering fully inverts between the two vectors.** `bastion` moves from second-cheapest to most expensive and `dorsal` from most expensive to cheapest. Both vectors are regression tests: if a factor table changes, this inversion is what breaks first.
 
 ---
 
@@ -349,7 +348,7 @@ simulated_partners:
             connection_error: 0.02
 ```
 
-Factor tables live in the simulator, in typed code, one class per partner. They are the partner's underwriting logic and belong on the partner's side of the boundary, never in the API's adapters. They also change as a set, and a typo in a YAML factor table is much harder to catch than one in typed code.
+Factor tables live in the simulator, in typed code, one class per partner. They are the partner's underwriting logic and belong on the partner's side of the boundary, never in `Infrastructure/Partner`. They also change as a set, and a typo in a YAML factor table is much harder to catch than one in typed code.
 
 `enabled: false` removes a partner from the comparison entirely. It does not appear in the per-partner status list and is not counted as a failure.
 
@@ -361,12 +360,12 @@ Factor tables live in the simulator, in typed code, one class per partner. They 
 
 The acceptance criterion in US-07 is that a fifth partner requires no change to existing behaviour. Concretely:
 
-1. Implement the partner port in a new adapter class with its own factor tables.
-2. Register it with the partner tag so the registry discovers it.
-3. Add a configuration entry.
+1. Add a pricing engine class in the simulator with its factor table.
+2. Add a simulator-side configuration entry.
+3. Add an API-side configuration entry (display name, path, timeout). The registry reads this list from configuration; there is no per-partner adapter class and no partner tag.
 4. Add its factor table to this document, and one test vector.
 
-No orchestration code, no API code and no frontend code changes. No existing test changes. If any of those are needed, the boundary needs revisiting in `03-architecture.md` rather than working around it here.
+No orchestration code, no API code and no frontend code changes. No existing test changes.
 
 ---
 

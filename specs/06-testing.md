@@ -1,15 +1,12 @@
 # Testing Strategy
 
-**Status:** Draft
-**Related documents:** `01-product-spec.md`, `03-architecture.md`, `04-providers.md`, `05-api-contract.md`
-
 ---
 
 ## 1. Where Tests Come From
 
-Every acceptance criteria in `01-product-spec.md` section 6 maps to at least one named test. Section 5 of this document holds that map, and it is the checklist for whether the implementation is finished.
+Every acceptance criterion in `01-product-spec.md` section 6 maps to at least one named test. Section 5 holds that map.
 
-Nothing here is a coverage percentage. A percentage target rewards testing getters and says nothing about whether a partner timeout is handled.
+Tests come from those criteria, not from a coverage percentage. A percentage target rewards testing getters and says nothing about whether a partner timeout is handled.
 
 ---
 
@@ -104,7 +101,7 @@ Exactly one test, at L6, runs with production values and asserts that four partn
 
 The simulator and the adapter live in the same repository and can drift apart silently: a field renamed on one side keeps every unit test green because both sides are mocked in their own tests.
 
-One test closes that gap. It calls the simulator's real success endpoint, feeds the raw body into the adapter's parser, and asserts an `Offer` comes out. It is the cheapest test in the suite and the one that catches the failure nobody would look for.
+One test closes that gap. It calls the simulator's real success endpoint, feeds the raw body into the adapter's parser, and asserts an `Offer` comes out.
 
 ---
 
@@ -129,7 +126,7 @@ Tests state only what they care about. A test about coverage should not have to 
 
 - **Every cell of every factor table.** The two vectors cover 56 factor lookups between them. Add only the age boundaries, where an off-by-one is plausible: 17/18, 24/25, 34/35, 54/55, 69/70.
 - **Symfony.** Routing, serialisation and the container are not this project's code.
-- **The whole response body as a snapshot.** Snapshots turn every intentional field addition into a red test, and the habit that forms is regenerating them without reading the diff.
+- **The whole response body as a snapshot.** Snapshots turn every intentional field addition into a red test.
 - **Exact simulated latencies.** Assert that a call was cut off at the timeout, never that it took 1.643 ms.
 
 ---
@@ -138,17 +135,15 @@ Tests state only what they care about. A test about coverage should not have to 
 
 ## 9. Priority
 
-The budget is likely to run out before the list does. Cut from the bottom.
+Cut from the bottom.
 
 
 | Tier        | Levels | Rationale                                                                                                     |
 | ----------- | ------ | ------------------------------------------------------------------------------------------------------------- |
-| **Must**    | L1–L5  | Without these, the acceptance criteria are unverified and the specification is a claim rather than a contract |
-| **Should**  | L6, L7 | L6 is the only proof of concurrency. L7 covers the storage expiry logic, which is easy to get subtly wrong.   |
-| **If time** | L8, L9 | Valuable, but they retest rules already covered below                                                         |
+| **Must**    | L1–L5  | The acceptance criteria are unverified without these                                              |
+| **Should**  | L6, L7 | L6 is the only proof of concurrency. L7 covers the storage expiry logic.                          |
+| **If time** | L8, L9 | They retest rules already covered below                                                                       |
 
-
-If a tier is skipped, say so in the delivery rather than leaving the reviewer to notice. An explicit "L9 not written, here is what it would have covered" reads as a decision. Silence reads as an oversight.
 
 ---
 
